@@ -260,6 +260,7 @@ Environments are pulled from the [DeepMind Control Suite](https://github.com/goo
 | [Baseline](https://github.com/galilai-group/stable-worldmodel/tree/main/scripts/train) | Type              |
 |----------|-------------------|
 | DINO-WM  | JEPA              |
+| PhysWM   | JEPA + Physics    |
 | PLDM     | JEPA              |
 | LeWM     | JEPA              |
 | GCBC     | Behaviour Cloning |
@@ -267,6 +268,41 @@ Environments are pulled from the [DeepMind Control Suite](https://github.com/goo
 | GCIQL    | RL                |
 
 </div>
+
+### Physics-grounded world models (PhysWM)
+
+`PhysWM` makes two next-state predictions from the **same** DINO-WM latent and
+supervises both on the dataset's ground-truth `s_next` — one learned, one
+computed by a hardcoded physics solver:
+
+```
+                     ┌── predictor ──► ẑ ── decoder ─────────────► s_A   (learned)
+pixels ── encoder ──►│
+                (z)  └── probe ──► θ ──► frozen physics solver ──► s_B   (physical)
+                                          (s_t, a_t, θ)
+
+L = L_A + α·L_B + β·L_consistency          (β = 0 by default)
+```
+
+The probe is a low-capacity read-out that emits a physics-parameter vector `θ`
+(one per episode by default), which a **frozen, differentiable, zero-parameter**
+solver integrates into a next state. Gradients flow through the integrator into
+the probe, so `θ` is always a forward-pass quantity and never a free variable
+fitted to the targets. Where an environment's true parameters are known, the
+probe is scored with an identifiability R² certificate.
+
+Three solvers ship with it — `pokeworld`, `cartpole` (dm_control) and `pusht`
+— and each one's ability to actually fit its environment is measured, not
+assumed, by `scripts/smoke/validate_solvers.py`.
+
+```bash
+export MUJOCO_GL=egl                      # dm_control rendering, headless
+python scripts/train/physwm.py bench=cartpole
+python scripts/smoke/run_smoke.py         # full smoke suite
+```
+
+See [`stable_worldmodel/wm/physwm/README.md`](stable_worldmodel/wm/physwm/README.md)
+for the design rules, the invariants that enforce them, and measured results.
 
 ## Command-Line Interface
 
