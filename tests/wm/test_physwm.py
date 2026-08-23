@@ -6,7 +6,8 @@ just that the code runs:
 1. the solver is frozen and parameter-free;
 2. gradients reach the probe *through* the solver;
 3. theta is a forward-pass probe output, never a free variable;
-4. Path B is supervised on ground truth and never on Path A;
+4. Path A is supervised on the dataset ground truth; Path B is supervised
+   on Path A's detached prediction, and A never trains on B;
 5. the loss decomposes exactly as ``L_A + alpha*L_B + beta*L_cons``.
 """
 
@@ -176,7 +177,7 @@ def test_gradients_reach_probe_through_frozen_solver():
     batch = make_batch(model)
     out = model(batch)
     # use L_B alone: its sole route to the probe is through the solver
-    loss = (out['state_b'] - out['target']).pow(2).mean()
+    loss = (out['state_b'] - out['state_a'].detach()).pow(2).mean()
     loss.backward()
     grad = model.probe.net[-1].weight.grad
     assert grad is not None
@@ -215,20 +216,22 @@ def test_per_episode_theta_shape_and_per_step_option():
 
 
 # ---------------------------------------------------------------------
-# 4. Path B is supervised on ground truth, never on Path A
+# 4. A regresses ground truth; B regresses A; A never trains on B
 # ---------------------------------------------------------------------
 
 
 def test_loss_b_does_not_depend_on_path_a():
     """L_B must carry no gradient into the Path A decoder head.
 
-    This is the structural guarantee that Path B is never supervised on
-    Path A: if L_B touched A's output, the decoder would receive gradient.
+    Path B's target IS Path A's prediction, but it is detached first: this
+    is the structural guarantee that fitting the physics path never trains
+    Path A. If ``a`` were not detached before use as B's target, the
+    decoder would receive gradient here.
     """
     model = make_model()
     batch = make_batch(model)
     out = model(batch)
-    loss_b = (out['state_b'] - out['target']).pow(2).mean()
+    loss_b = (out['state_b'] - out['state_a'].detach()).pow(2).mean()
     loss_b.backward()
     head = model.state_decoder.net[-1]
     assert head.weight.grad is None or head.weight.grad.abs().sum() == 0
@@ -245,7 +248,8 @@ def test_loss_a_does_not_depend_on_the_probe():
     assert grad is None or grad.abs().sum() == 0
 
 
-def test_both_paths_regress_the_same_ground_truth():
+def test_a_regresses_dataset_b_regresses_path_a():
+    """A's target is the dataset ``s_next``; B's target is A, detached."""
     model = make_model()
     out = model(make_batch(model))
     losses = physwm_loss(out)
@@ -253,6 +257,11 @@ def test_both_paths_regress_the_same_ground_truth():
         losses['loss_a'], (out['state_a'] - out['target']).pow(2).mean()
     )
     assert torch.allclose(
+        losses['loss_b'],
+        (out['state_b'] - out['state_a'].detach()).pow(2).mean(),
+    )
+    # and NOT against the dataset target directly
+    assert not torch.allclose(
         losses['loss_b'], (out['state_b'] - out['target']).pow(2).mean()
     )
 

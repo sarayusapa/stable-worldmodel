@@ -5,9 +5,10 @@
 
     L = L_A + alpha * L_B + beta * L_consistency
 
-Both paths are supervised on the dataset's ground-truth ``s_next``; Path B
-is never supervised on Path A. See ``stable_worldmodel/wm/physwm/`` for the
-design rules and the invariants that enforce them.
+Path A is supervised on the dataset's ground-truth ``s_next``; Path B is
+supervised on Path A's own detached prediction, not ``s_next`` directly.
+See ``stable_worldmodel/wm/physwm/`` for the design rules and the
+invariants that enforce them.
 
 Run:
 

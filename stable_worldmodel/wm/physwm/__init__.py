@@ -2,8 +2,11 @@
 
 Two next-state predictions from the same DINO-WM latent -- one learned
 (latent prediction decoded to state), one physical (probe -> theta ->
-frozen differentiable solver) -- both supervised on the dataset's
-ground-truth next state.
+frozen differentiable solver). The learned path is supervised on the
+dataset's ground-truth next state; the physical path is supervised on the
+learned path's own (detached) prediction, so the physics probe is fit to
+explain the world model's general belief about the next state rather than
+the raw benchmark label.
 """
 
 from .build import (

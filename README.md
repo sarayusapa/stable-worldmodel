@@ -1,6 +1,6 @@
 <h1 align="center">stable-worldmodel</h1>
 
-<p align="center"><i>A platform for reproducible world model research and evaluation.</i></p>
+<p align="center"><i>Probing physics from a general-purpose world model's own predictions — built on the stable-worldmodel platform.</i></p>
 
 <p align="center">
   <a href="https://galilai-group.github.io/stable-worldmodel/"><img alt="Documentation" src="https://img.shields.io/badge/Docs-blue.svg"/></a>
@@ -13,18 +13,118 @@
 </p>
 
 <p align="center">
+  <a href="#the-plan-physwm"><b>The Plan (PhysWM)</b></a> ·
+  <a href="#running-physwm"><b>Running It</b></a> ·
+  <a href="#the-platform-stable-worldmodel"><b>The Platform</b></a> ·
   <a href="#installation"><b>Installation</b></a> ·
-  <a href="#quick-start"><b>Quick Start</b></a> ·
-  <a href="#environments"><b>Environments</b></a> ·
-  <a href="#solvers-and-baselines"><b>Solvers & Baselines</b></a> ·
   <a href="https://galilai-group.github.io/stable-worldmodel/"><b>Documentation</b></a> ·
-  <a href="https://arxiv.org/abs/2605.21800v1"><b>Paper</b></a> ·
   <a href="#citation"><b>Citation</b></a>
 </p>
 
 ---
 
-`stable-worldmodel` provides a single, unified interface for the three stages of world model research — **collecting data**, **training**, and **evaluating with model-predictive control** — across a large suite of standardized environments. It ships with reference implementations of common baselines and planning solvers so research code can stay focused on the contribution that matters: the model and the objective.
+## The plan: PhysWM
+
+This repo is home to an ongoing experiment, **PhysWM**, that asks a narrow
+question: when a world model already predicts its own general next state,
+can a small, physics-parameterized model be probed *out of the same
+latent* to explain that prediction — rather than being fit directly to
+whatever the benchmark happened to record?
+
+Two next-state predictions branch off one encoder latent `z`:
+
+```
+                     ┌── predictor ──► ẑ ── decoder ─────────────► s_A   (learned, ← s_next)
+pixels ── encoder ──►│
+                (z)  └── probe ──► θ ──► frozen physics solver ──► s_B   (physical, ← s_A.detach())
+                                          (s_t, a_t, θ)
+
+L = L_A + α·L_B + β·L_consistency          (β = 0 by default)
+```
+
+- **Path A (learned)** is the general-purpose next-state prediction: latent
+  in, latent predicted forward, decoded to state. It is supervised on the
+  dataset's actual `s_next` — it has to stay anchored to reality.
+- **Path B (physical)** reads a low-capacity probe off the same latent to
+  emit `θ`, a vector of physics parameters (mass, gains, stiffness, ...),
+  and runs it through a **frozen, differentiable, zero-parameter** physics
+  solver to produce an independent next-state estimate.
+
+**The ground-truth question, and why it isn't the benchmark label.** Once
+both paths exist, what should Path B be compared against? Not itself,
+trivially — the experiment is whether physics *explains* something, not
+whether the solver can be made to output anything at all. That leaves two
+real candidates: the benchmark's recorded `s_next`, or Path A's own
+prediction. We use **Path A, detached, as Path B's target**.
+
+The motivation is a hierarchy-of-representations claim, not just a
+methodological preference: a world model can get plain next-state
+prediction decent without ever internalizing the physics that produced
+it — Path A can be a good high-level predictor while remaining a bad
+physicist. Fitting Path B to the raw dataset label conflates those two
+questions and mostly re-tests the first one, which Path A already answers,
+usually better. Fitting Path B to Path A's prediction instead isolates the
+second question: starting from what the high-level predictor already gets
+right, can a low-capacity, physically-constrained probe recover the
+compact physical parameterization *underneath* it? That's filling in the
+hierarchy — using the general prediction the model is already decent at as
+the training signal for the physics-aware latent structure it hasn't
+learned on its own. The detach keeps this one-directional — Path A gets no
+gradient back from `L_B`, so fitting the physics path never drags the
+learned prediction toward the solver; the pressure runs one way, from the
+general prediction onto the physics probe, the same direction as the
+hierarchy itself.
+
+`θ` is always a forward-pass output of the probe — never a free variable
+fitted directly to a target — so gradients into the probe only ever arrive
+by flowing through the frozen solver. Three solvers ship with it —
+`pokeworld` (synthetic, ground-truth `θ` for an identifiability
+certificate), `cartpole` (dm_control), and `pusht` — and each one's actual
+ability to fit its environment is measured, not assumed, by
+`scripts/smoke/validate_solvers.py`.
+
+See [`stable_worldmodel/wm/physwm/README.md`](stable_worldmodel/wm/physwm/README.md)
+for the full design rules, the invariants that enforce them (`tests/wm/test_physwm.py`),
+and measured solver-adequacy results per benchmark.
+
+## Running PhysWM
+
+```bash
+export MUJOCO_GL=egl                      # dm_control rendering, headless
+
+pytest tests/wm/test_physwm.py            # design invariants
+python scripts/smoke/run_smoke.py         # full smoke suite
+python scripts/smoke/validate_solvers.py  # solver adequacy diagnostic
+
+python scripts/train/physwm.py bench=pokeworld
+python scripts/train/physwm.py bench=cartpole trainer.max_epochs=50
+python scripts/train/physwm.py bench=pusht loss.alpha=0.5 loss.beta=0.1
+```
+
+## The platform: `stable-worldmodel`
+
+PhysWM isn't a separate codebase bolted on the side — it's built as one of
+the `stable_worldmodel.wm` model families and leans directly on the
+platform this repo provides:
+
+- **Environments** (`swm/*`) supply the live rollouts Path B's solver is
+  checked against — `pusht`, `cartpole` (dm_control) — plus a synthetic
+  `pokeworld` env for the identifiability certificate.
+- **The dataset pipeline** (Lance / HDF5 / video, see below) supplies the
+  offline transition windows PhysWM trains on, through the same
+  `swm.data.load_dataset` autodetection every other baseline in this repo
+  uses.
+- **Shared building blocks** — the block-causal spatio-temporal
+  predictor, the DINO backbone encoder — make Path A a drop-in
+  general-purpose next-state predictor rather than a bespoke model.
+- **Planning solvers** (CEM, MPPI, ...) are what a trained PhysWM
+  checkpoint would ultimately be evaluated with under model-predictive
+  control, the same as `DINO-WM`, `PLDM`, or any other baseline here.
+
+Everything from here down — installation, data formats, the environment
+suite, the planning solvers, the other baselines — is that shared
+substrate: the infrastructure the plan above runs on, reusable by any
+world model research built in this repo, including PhysWM's.
 
 ## Installation
 
@@ -269,40 +369,10 @@ Environments are pulled from the [DeepMind Control Suite](https://github.com/goo
 
 </div>
 
-### Physics-grounded world models (PhysWM)
-
-`PhysWM` makes two next-state predictions from the **same** DINO-WM latent and
-supervises both on the dataset's ground-truth `s_next` — one learned, one
-computed by a hardcoded physics solver:
-
-```
-                     ┌── predictor ──► ẑ ── decoder ─────────────► s_A   (learned)
-pixels ── encoder ──►│
-                (z)  └── probe ──► θ ──► frozen physics solver ──► s_B   (physical)
-                                          (s_t, a_t, θ)
-
-L = L_A + α·L_B + β·L_consistency          (β = 0 by default)
-```
-
-The probe is a low-capacity read-out that emits a physics-parameter vector `θ`
-(one per episode by default), which a **frozen, differentiable, zero-parameter**
-solver integrates into a next state. Gradients flow through the integrator into
-the probe, so `θ` is always a forward-pass quantity and never a free variable
-fitted to the targets. Where an environment's true parameters are known, the
-probe is scored with an identifiability R² certificate.
-
-Three solvers ship with it — `pokeworld`, `cartpole` (dm_control) and `pusht`
-— and each one's ability to actually fit its environment is measured, not
-assumed, by `scripts/smoke/validate_solvers.py`.
-
-```bash
-export MUJOCO_GL=egl                      # dm_control rendering, headless
-python scripts/train/physwm.py bench=cartpole
-python scripts/smoke/run_smoke.py         # full smoke suite
-```
-
-See [`stable_worldmodel/wm/physwm/README.md`](stable_worldmodel/wm/physwm/README.md)
-for the design rules, the invariants that enforce them, and measured results.
+`PhysWM` is this repo's active project — see [The Plan](#the-plan-physwm) at
+the top of this document for the architecture, the objective, and why its
+physics path is fit to the learned path's prediction rather than the raw
+benchmark label.
 
 ## Command-Line Interface
 

@@ -2,17 +2,21 @@
 
     L = L_A + alpha * L_B + beta * L_consistency
 
-    L_A            = || state_A          - s_next ||^2
-    L_B            = || solver(theta)    - s_next ||^2
+    L_A            = || state_A          - s_next   ||^2
+    L_B            = || solver(theta)    - state_A' ||^2   (state_A' = state_A.detach())
     L_consistency  = || state_A          - solver(theta) ||^2      (beta = 0)
 
-Both ``L_A`` and ``L_B`` regress the **dataset ground truth** ``s_next``.
-Path B is *never* supervised on Path A's output: that would turn the
-physics path into a distillation of the learned path and destroy the
-point of the experiment (an independent physical estimate of the same
-transition). ``L_consistency`` is off by default (``beta = 0``) and, when
-enabled, is symmetric -- it pulls the two paths together rather than
-pointing one at the other.
+``L_A`` regresses the **dataset ground truth** ``s_next`` -- Path A is the
+model's general-purpose next-state prediction and must stay anchored to
+reality. ``L_B`` regresses **Path A's own prediction**, detached, instead
+of the dataset label: the experiment is whether a physics parameterization
+can explain what the world model already believes happens next, not
+whether the solver can re-derive the raw benchmark label directly. The
+detach is what keeps this a "ground truth" in the loss sense -- the target
+for ``L_B`` carries no gradient of its own, so fitting the physics path
+never pulls Path A's decoder toward the solver. ``L_consistency`` is off by
+default (``beta = 0``) and, when enabled, is symmetric -- it pulls the two
+paths together rather than pointing one at the other.
 
 All terms are computed in normalized state space (see ``physwm.py``) so
 they are commensurate and ``alpha``/``beta`` are scale-free.
@@ -38,10 +42,9 @@ def physwm_loss(
         consistency_detach:
             ``'none'`` (default) -- symmetric, gradients reach both paths.
             ``'b'`` -- detach Path B, so consistency only pulls A toward B.
-            ``'a'`` -- detach Path A. NOTE this makes the consistency term
-            a supervision of B on A, which violates the design rule above.
-            It exists only as an explicit, opt-in ablation and is inert
-            while ``beta == 0``.
+            ``'a'`` -- detach Path A. Redundant with ``L_B`` (both become
+            ``(a.detach() - b)^2``); kept only so the consistency term can
+            be swept independently of ``alpha``. Inert while ``beta == 0``.
 
     Returns:
         dict with ``loss`` plus every component, detached for logging.
@@ -52,9 +55,13 @@ def physwm_loss(
 
     a, b, target = out['state_a'], out['state_b'], out['target']
 
-    # --- both paths regress ground truth; B never regresses A -----------
+    # --- A regresses the dataset ground truth ----------------------------
     loss_a = (a - target).pow(2).mean()
-    loss_b = (b - target).pow(2).mean()
+    # --- B regresses Path A's (detached) prediction, not the benchmark ---
+    # label: the physics probe is fit to explain the WM's general belief
+    # about the next state. Detaching means A gets no gradient from this
+    # term -- it stays purely anchored to `target`.
+    loss_b = (b - a.detach()).pow(2).mean()
 
     a_c = a.detach() if consistency_detach == 'a' else a
     b_c = b.detach() if consistency_detach == 'b' else b
@@ -78,6 +85,14 @@ def physwm_metrics(out: dict, solver=None) -> dict:
       normalized loss);
     * theta summary statistics per named parameter.
 
+    ``rmse_a`` and ``rmse_b`` are scored against each path's own training
+    target (dataset ``s_next`` for A, Path A's detached prediction for B)
+    so they track the losses being optimized. ``rmse_b_vs_dataset`` is an
+    extra, non-training diagnostic: how physically accurate the solver's
+    output is against the real ``s_next``, even though nothing in the loss
+    pushes it there directly -- useful to see whether fitting the physics
+    path to the WM's own belief also keeps it grounded in reality.
+
     The identifiability certificate (:func:`theta_r2`) is deliberately
     NOT computed here: R^2 is only meaningful over a sample in which the
     true parameter actually varies, and a single minibatch usually holds
@@ -87,7 +102,8 @@ def physwm_metrics(out: dict, solver=None) -> dict:
     metrics = {}
     tgt = out['target']
     metrics['rmse_a'] = (out['state_a'] - tgt).pow(2).mean().sqrt()
-    metrics['rmse_b'] = (out['state_b'] - tgt).pow(2).mean().sqrt()
+    metrics['rmse_b'] = (out['state_b'] - out['state_a']).pow(2).mean().sqrt()
+    metrics['rmse_b_vs_dataset'] = (out['state_b'] - tgt).pow(2).mean().sqrt()
 
     theta = out['theta']
     flat = theta.reshape(-1, theta.shape[-1])
