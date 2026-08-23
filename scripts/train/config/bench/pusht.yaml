@@ -1,0 +1,53 @@
+# PushT (swm/PushT-v1).
+# State is [agent_xy, block_xy, block_angle, agent_vxy] in pixel units on a
+# 512x512 field -- the last two entries are the AGENT's velocity.
+# Action is the relative action in [-1,1]^2, scaled by 100 into a target.
+benchmark: pusht
+
+probe_frames: context
+solver_state_source: gt
+
+encoder:
+  name: tiny_cnn
+  image_size: 64
+  patch_size: 16
+  embed_dim: 128
+  width: 64
+
+action_encoder:
+  emb_dim: 32
+
+predictor:
+  hidden_dim: 256
+  depth: 4
+  heads: 8
+  dim_head: 32
+  mlp_dim: 512
+  dropout: 0.0
+  max_frames: 16
+
+decoder:
+  hidden_dim: 256
+  depth: 2
+  pool: mean
+
+probe:
+  hidden_dim: 0
+  mode: episode
+  pool: mean
+  dropout: 0.0
+  detach_input: false
+  init_scale: 0.01
+
+solver:
+  name: pusht
+  # PushT runs 1/(dt*control_hz) = 10 pymunk steps of 0.01s per env step
+  dt: 0.01
+  substeps: 10
+
+data:
+  num_episodes: 32
+  episode_length: 48
+  window: 8
+  stride: 1
+  frameskip: 1

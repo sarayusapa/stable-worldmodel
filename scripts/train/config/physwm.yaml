@@ -1,0 +1,39 @@
+# PhysWM: physics-grounded world model with two next-state paths.
+#   L = L_A + alpha * L_B + beta * L_consistency
+defaults:
+  - _self_
+  - bench: pokeworld
+
+output_model_name: physwm_${bench.benchmark}
+seed: 0
+deterministic: true
+device: auto
+# how many windows to draw when fitting the state/action normalizers
+norm_samples: 512
+
+loss:
+  alpha: 1.0 # weight on the physics path L_B
+  beta: 0.0 # consistency ||A - solver(theta)||^2, OFF by default
+  # 'none' keeps consistency symmetric. 'a' would make it a supervision
+  # of B on A, which violates the design rule; opt-in ablation only.
+  consistency_detach: none
+
+trainer:
+  max_epochs: 30
+  grad_clip: 1.0
+  warmup_frac: 0.05
+  ckpt_every: 10
+
+loader:
+  batch_size: 32
+  num_workers: 0
+
+optimizer:
+  lr: 3e-4
+  wd: 1e-4
+
+wandb:
+  enabled: false
+  project: physwm
+  name: null
+  mode: online

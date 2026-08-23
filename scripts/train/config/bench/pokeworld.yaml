@@ -1,0 +1,56 @@
+# PokeWorld -- the identifiability benchmark.
+# Ground-truth theta is known per episode, so the probe is scored with an
+# R^2 certificate. mass/stiffness/drag only enter as ratios, so they are
+# NOT individually identifiable by construction -- that is the point.
+benchmark: pokeworld
+
+# probe pools over the frames the solver steps FROM, so it never sees the
+# target frame it is scored against
+probe_frames: context
+# 'gt' feeds the solver the dataset state (isolates theta estimation);
+# 'decoded' feeds it the decoder's read-out of the current latent
+solver_state_source: gt
+
+encoder:
+  name: tiny_cnn # tiny_cnn | dinov2 | state
+  image_size: 64
+  patch_size: 16
+  embed_dim: 128
+  width: 64
+
+action_encoder:
+  emb_dim: 32
+
+predictor:
+  hidden_dim: 256
+  depth: 4
+  heads: 8
+  dim_head: 32
+  mlp_dim: 512
+  dropout: 0.0
+  max_frames: 16
+
+decoder:
+  hidden_dim: 256
+  depth: 2
+  pool: mean
+
+probe:
+  hidden_dim: 0 # 0 = single linear map (lowest-capacity probe)
+  mode: episode # one theta per episode; 'step' for per-timestep
+  pool: mean
+  dropout: 0.0
+  detach_input: false # let Path B's gradient shape the latent
+  init_scale: 0.01
+
+solver:
+  name: pokeworld
+  dt: 0.01 # matches PokeWorldSim: 10 substeps x 0.01s per transition
+  substeps: 10
+
+data:
+  num_episodes: 64
+  episode_length: 64
+  window: 8
+  stride: 1
+  sim: {} # PokeWorldSim overrides, e.g. drag_exponent for mismatch

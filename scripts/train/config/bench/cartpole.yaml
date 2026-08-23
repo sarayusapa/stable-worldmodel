@@ -1,0 +1,54 @@
+# dm_control cartpole (swm/CartpoleDMControl-v0).
+# State is [x, angle, x_dot, angle_dot] = [qpos, qvel]; angle is measured
+# from upright, matching CartpoleSolver.
+# Rendering needs a GL backend: export MUJOCO_GL=egl
+benchmark: cartpole
+
+probe_frames: context
+solver_state_source: gt
+
+encoder:
+  name: tiny_cnn
+  image_size: 64
+  patch_size: 16
+  embed_dim: 128
+  width: 64
+
+action_encoder:
+  emb_dim: 32
+
+predictor:
+  hidden_dim: 256
+  depth: 4
+  heads: 8
+  dim_head: 32
+  mlp_dim: 512
+  dropout: 0.0
+  max_frames: 16
+
+decoder:
+  hidden_dim: 256
+  depth: 2
+  pool: mean
+
+probe:
+  hidden_dim: 0
+  mode: episode
+  pool: mean
+  dropout: 0.0
+  detach_input: false
+  init_scale: 0.01
+
+solver:
+  name: cartpole
+  # dm_control physics dt = 0.01 and the swm wrapper applies action_repeat
+  # = 2, so one transition at frameskip=1 spans 2 x 0.01s.
+  dt: 0.01
+  substeps: 2
+
+data:
+  num_episodes: 64
+  episode_length: 64
+  window: 8
+  stride: 1
+  frameskip: 1
