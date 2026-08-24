@@ -1,20 +1,24 @@
 # PhysWM — a physics-grounded world model
 
-Two next-state predictions from the **same** DINO-WM latent, both
-supervised on the dataset's ground-truth `s_next`:
+Two next-state predictions from the **same** DINO-WM latent. Path A is
+supervised on the dataset's ground-truth `s_next`; Path B is supervised on
+Path A's own (detached) prediction instead — the experiment is whether a
+physics parameterization can explain what the world model *itself*
+believes happens next, not whether the solver can re-derive the raw
+benchmark label:
 
 ```
-                     ┌── predictor ──► ẑ ── decoder ──────────────► s_A   (Path A, learned)
+                     ┌── predictor ──► ẑ ── decoder ──────────────► s_A   (Path A, learned, ← s_next)
 pixels ── encoder ──►│
-                (z)  └── probe ──► θ ──► frozen physics solver ───► s_B   (Path B, physical)
+                (z)  └── probe ──► θ ──► frozen physics solver ───► s_B   (Path B, physical, ← s_A.detach())
                                           (s_t, a_t, θ)
 ```
 
 ```
 L = L_A + α·L_B + β·L_consistency
 
-L_A           = ‖ s_A            − s_next ‖²
-L_B           = ‖ solver(θ)      − s_next ‖²
+L_A           = ‖ s_A            − s_next        ‖²
+L_B           = ‖ solver(θ)      − s_A.detach()  ‖²
 L_consistency = ‖ s_A − solver(θ) ‖²          (β = 0 by default)
 ```
 
@@ -23,7 +27,7 @@ L_consistency = ‖ s_A − solver(θ) ‖²          (β = 0 by default)
 | Rule | Enforced by |
 |---|---|
 | Two predictions branch off one latent; neither is fitted to the other | `PhysWM.forward` — both paths read `z` |
-| Both paths regress ground truth; **B is never supervised on A** | `loss.physwm_loss`; tested by `test_loss_b_does_not_depend_on_path_a` (L_B carries no gradient into the Path A decoder) |
+| A regresses ground truth; **B regresses A's detached output, and A is never trained on B** | `loss.physwm_loss`; tested by `test_loss_b_does_not_depend_on_path_a` (L_B carries no gradient into the Path A decoder) |
 | θ is a low-capacity forward-pass probe output, per-episode by default; **never** a free per-step variable | `ThetaProbe`; `assert_no_free_theta` runs in `PhysWM.__init__` |
 | Solver is frozen, differentiable, **zero** learnable parameters | `PhysicsSolver.assert_frozen`; bounds live in buffers, θ is always a forward argument |
 

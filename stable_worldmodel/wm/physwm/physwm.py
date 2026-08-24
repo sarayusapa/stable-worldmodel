@@ -1,19 +1,26 @@
 """PhysWM -- a physics-grounded world model with two next-state paths.
 
-Both paths read the **same** encoder latent and are supervised on the
-**same** dataset ground truth ``s_next``:
+Both paths read the **same** encoder latent:
 
     Path A (learned):   pixels -> z -> predictor -> z_hat -> decoder -> s_A
     Path B (physical):  pixels -> z -> probe -> theta -> solver(s_t, a_t,
                         theta) -> s_B
 
+Path A regresses the dataset's ground truth ``s_next``. Path B regresses
+Path A's own (detached) prediction, not ``s_next`` directly: the
+experiment is whether a physics parameterization can explain the world
+model's *general* next-state belief, not whether the solver can re-derive
+the raw benchmark label.
+
 Design rules enforced here (and covered by ``tests/wm/test_physwm.py``):
 
 1. **Two predictions, one latent.** Path A and Path B both branch off the
    encoder latent ``z``. Neither path is a post-hoc fit to the other.
-2. **Both supervised on ground truth. Never supervise B on A.** ``L_A`` and
-   ``L_B`` both regress the dataset's ``s_next``. The optional consistency
-   term is symmetric and its weight is 0 by default -- see ``loss.py``.
+2. **A regresses ground truth; B regresses A, and A never regresses B.**
+   ``L_A`` regresses the dataset's ``s_next``. ``L_B`` regresses Path A's
+   detached prediction, so fitting the physics path never pulls Path A's
+   decoder toward the solver. The optional consistency term is symmetric
+   and its weight is 0 by default -- see ``loss.py``.
 3. **Theta is a forward-pass probe output.** It is produced by
    ``probe(z)`` on every forward pass, defaults to one vector per episode,
    and is never an ``nn.Parameter``. ``assert_no_free_theta`` makes this a
@@ -211,13 +218,16 @@ class PhysWM(nn.Module):
         state_b_phys = self.solver(s_cur, action[:, :-1], theta)
         state_b = self.state_norm.norm(state_b_phys)
 
-        # ---- ground truth (the ONLY supervision target for both paths) --
+        # ---- dataset ground truth (supervision target for Path A only) --
+        # Path B's target is state_a (detached), assembled in loss.py --
+        # both paths are returned here and physwm_loss picks the right
+        # target for each.
         target = self.state_norm.norm(state[:, 1:])
 
         return {
             'state_a': state_a,  # Path A prediction (normalized)
             'state_b': state_b,  # Path B prediction (normalized)
-            'target': target,  # dataset s_next (normalized)
+            'target': target,  # dataset s_next (normalized); Path A's target
             'theta': theta,  # bounded physics params
             'theta_raw': theta_raw,
             'z': z,
