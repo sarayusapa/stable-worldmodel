@@ -299,10 +299,16 @@ assumed, by `scripts/smoke/validate_solvers.py`.
 export MUJOCO_GL=egl                      # dm_control rendering, headless
 python scripts/train/physwm.py bench=cartpole
 python scripts/smoke/run_smoke.py         # full smoke suite
+
+# Serious H100 profile: DINOv2-small at 224px, BF16, 256 episodes, 50 epochs
+python scripts/train/physwm.py bench=cartpole hardware=h100 seed=0
 ```
 
 See [`stable_worldmodel/wm/physwm/README.md`](stable_worldmodel/wm/physwm/README.md)
 for the design rules, the invariants that enforce them, and measured results.
+
+Log every run — command, config, seed, hardware and results — in
+[`progress.md`](progress.md); the paper's numbers are traced back to it.
 
 ## Command-Line Interface
 
