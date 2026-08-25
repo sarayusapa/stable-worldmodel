@@ -42,10 +42,21 @@ class PokeWorldSim:
     :class:`PokeWorldSolver` models exactly. Set ``p != 1`` to introduce
     deliberate structural mismatch between the data and the solver.
 
-    Note the built-in degeneracy: only ``k/m`` and ``c/m`` affect the
-    trajectory, so ``m``, ``k`` and ``c`` are not individually
-    identifiable. This is intentional -- it gives the certificate
-    something real to detect.
+    Parameter ranges and the observability structure follow the reference
+    PokeWorld (``latent-world-model-identifiability``): the three
+    parameters span a deliberate observability spectrum -- drag is chiefly
+    visual (glide decay), mass cross-modal (impulse/velocity coupling) and
+    stiffness almost purely tactile (sub-step contact peaks).
+
+    Making all three *individually* identifiable requires observing
+    contact force, not just motion: from motion alone the dynamics depend
+    only on ``k/m`` and ``c/m``. The state therefore carries a fifth
+    channel, ``touch`` -- the PEAK contact-force magnitude over the
+    sub-steps of the transition that led into this state. With touch
+    observed, ``k`` follows from the contact peak, ``m`` from the ratio of
+    contact impulse to velocity change, and ``c`` from decay during
+    free glide. Rendering is unchanged and identical across theta: the
+    physics is hidden from the pixels, exposed only through dynamics.
     """
 
     theta_names = (
@@ -58,13 +69,13 @@ class PokeWorldSim:
 
     def __init__(
         self,
-        dt: float = 0.01,
-        substeps: int = 10,
+        dt: float = 0.001,
+        substeps: int = 20,
         world_size: float = 1.0,
         drag_exponent: float = 1.0,
-        mass_range=(0.5, 2.0),
-        stiffness_range=(20.0, 200.0),
-        drag_range=(0.2, 4.0),
+        mass_range=(0.5, 3.0),
+        stiffness_range=(500.0, 6000.0),
+        drag_range=(0.5, 4.0),
         poker_radius: float = 0.10,
         object_radius: float = 0.10,
     ):
@@ -94,7 +105,24 @@ class PokeWorldSim:
         )
 
     def rollout(self, rng, length: int):
-        """One episode. Returns ``(states, actions, theta)``."""
+        """One episode. Returns ``(states, actions, theta)``.
+
+        State is ``[x, y, vx, vy, touch]``. ``touch`` is
+        ``log1p(peak contact force)`` over the sub-steps of the transition
+        that produced this state, so ``states[0, 4]`` is 0 by construction
+        (no preceding transition). The peak -- not an end-of-step sample --
+        is what makes stiffness observable: with stiff contacts the force
+        spikes and decays well inside one transition.
+
+        The log compression is not cosmetic. Raw peak force is
+        zero-inflated (contact fires in ~5% of transitions) with a range of
+        0-700, so after z-scoring the silent majority collapses onto one
+        value and the contact events become +20 sigma outliers. Squared
+        error on that target is dominated by rare spikes and teaches
+        nothing in between. ``log1p`` puts the channel in 0-6.6 and makes
+        the contact events ordinary-sized, which is also how real tactile
+        transduction behaves (compressive, Weber-Fechner-like).
+        """
         theta = self.sample_theta(rng)
         m, k, c = theta[0], theta[1], theta[2]
         contact = self.poker_radius + self.object_radius
@@ -104,27 +132,37 @@ class PokeWorldSim:
         # the poker performs a smooth random walk so contact is frequent
         poker = pos + rng.uniform(-contact, contact, size=2)
 
-        states = np.zeros((length, 4), dtype=np.float32)
+        states = np.zeros((length, 5), dtype=np.float32)
         actions = np.zeros((length, 2), dtype=np.float32)
         drift = rng.normal(0, 1, size=2)
+        touch = 0.0
 
         for t in range(length):
-            states[t] = np.concatenate([pos, vel])
+            states[t] = np.concatenate([pos, vel, [np.log1p(touch)]])
             drift = 0.85 * drift + 0.15 * rng.normal(0, 1, size=2)
             poker = np.clip(
                 poker + 0.03 * drift, -self.world_size, self.world_size
             )
             actions[t] = poker
 
+            touch = 0.0
             for _ in range(self.substeps):
                 delta = pos - poker
                 dist = max(np.linalg.norm(delta), 1e-6)
                 overlap = max(contact - dist, 0.0)
-                f = k * overlap * (delta / dist)
+                f_contact = k * overlap * (delta / dist)
+                touch = max(touch, float(np.linalg.norm(f_contact)))
                 speed = np.linalg.norm(vel)
-                f = f - c * (speed ** (self.drag_exponent - 1.0)) * vel
+                f = f_contact - c * (speed ** (self.drag_exponent - 1.0)) * vel
                 vel = vel + self.dt * f / m
                 pos = pos + self.dt * vel
+                # elastic walls at the edge of the rendered field. Without
+                # them a stiff contact launches the object off-screen and
+                # the observation carries no information about the state at
+                # all -- at k up to 6000 that happened in ~20% of frames.
+                over = pos - np.clip(pos, -self.world_size, self.world_size)
+                pos = pos - 2.0 * over
+                vel = np.where(over != 0.0, -vel, vel)
 
         return states, actions, theta
 
@@ -167,6 +205,11 @@ def pokeworld_episodes(
             'state': states,
             'action': actions,
             'theta_true': theta,
+            # the tactile reading is also an OBSERVATION, so it is exposed
+            # under its own key. The model must never index the `state`
+            # tensor for inputs -- that array is the supervision target,
+            # and reading it there is how target leakage starts.
+            'touch': states[:, 4].copy(),
         }
         if render:
             ep['pixels'] = sim.render(states, actions, image_size)
@@ -346,14 +389,33 @@ class EpisodeWindowDataset(Dataset):
     matters because per-episode theta must be constant within a window.
     """
 
-    def __init__(self, episodes, window: int, stride: int = 1):
+    def __init__(
+        self,
+        episodes,
+        window: int,
+        stride: int = 1,
+        context: int | None = None,
+        require_context_touch: bool = False,
+    ):
         assert window >= 2, 'window must cover at least one transition'
+        if require_context_touch:
+            assert context is not None and 1 <= context < window - 1
         self.episodes = episodes
         self.window = window
         self.index = []
         for ep_i, ep in enumerate(episodes):
             n = ep['state'].shape[0]
             for start in range(0, n - window + 1, stride):
+                if require_context_touch:
+                    assert 'touch' in ep, (
+                        'require_context_touch needs a touch observation'
+                    )
+                    # touch[t] summarizes transition t-1 -> t. Context K
+                    # owns touch indices 1..K; K+1 is the first query
+                    # outcome and must not be used for window selection.
+                    touch = ep['touch'][start + 1:start + context + 1]
+                    if not np.any(touch > 0):
+                        continue
                 self.index.append((ep_i, start))
         assert self.index, f'no windows: episodes shorter than window={window}'
 
@@ -372,15 +434,33 @@ class EpisodeWindowDataset(Dataset):
             item['pixels'] = torch.from_numpy(ep['pixels'][sl]).float()
         if 'theta_true' in ep:
             item['theta_true'] = torch.from_numpy(ep['theta_true']).float()
+        if 'touch' in ep:
+            item['touch'] = torch.from_numpy(ep['touch'][sl]).float()
         item['episode'] = torch.tensor(ep_i)
         return item
 
 
-def collect_stats(dataset, max_items: int = 512):
-    """Gather ``(state, action)`` tensors for fitting the normalizers."""
+def collect_stats(dataset, max_items: int = 512, seed: int = 0):
+    """Gather ``(state, action)`` tensors for fitting the normalizers.
+
+    The sample is drawn at RANDOM across the whole dataset, not from the
+    front. Windows are laid out episode by episode, so taking the first
+    ``max_items`` of them reads only the first few episodes -- at window 8
+    and stride 1 a 48-step episode yields 41 windows, so 512 windows is
+    about 12 episodes. PokeWorld redraws theta every episode over wide
+    ranges, so those 12 episodes are a badly biased sample of the state
+    distribution, and the bias grows as episodes are added (512 windows of
+    a 1024-episode set is the first 1.2% of it).
+
+    A mis-fitted normalizer is not cosmetic: every loss term is computed
+    in normalized space, so it silently reweights the state dimensions
+    against each other and distorts what the model is optimizing.
+    """
     n = min(len(dataset), max_items)
-    states = torch.stack([dataset[i]['state'] for i in range(n)])
-    actions = torch.stack([dataset[i]['action'] for i in range(n)])
+    g = torch.Generator().manual_seed(seed)
+    idx = torch.randperm(len(dataset), generator=g)[:n].tolist()
+    states = torch.stack([dataset[i]['state'] for i in idx])
+    actions = torch.stack([dataset[i]['action'] for i in idx])
     return states, actions
 
 

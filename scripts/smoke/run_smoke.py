@@ -4,7 +4,7 @@ Runs, in order:
 
 1. **unit tests** -- the design invariants (frozen solver, gradients
    through the solver into the probe, theta never a free variable, Path B
-   never supervised on Path A, exact loss decomposition);
+   uses Path A's stopped-gradient prediction, exact loss decomposition);
 2. **solver validation** -- can each frozen solver fit its environment at
    all? (free-theta oracle vs. persistence baseline);
 3. **short training runs** -- every benchmark trains end to end and
@@ -39,6 +39,7 @@ def run(name, cmd, env=None):
         env={**os.environ, **(env or {})},
         capture_output=True,
         text=True,
+        check=False,
     )
     dt = time.time() - start
     ok = proc.returncode == 0
@@ -118,11 +119,11 @@ def main():
             [
                 PY,
                 '-c',
-                'from stable_worldmodel.wm.utils import load_pretrained;'
-                f'm = load_pretrained("smoke_physwm_{args.benchmarks[0]}'
-                '/weights.pt");'
-                'assert sum(p.numel() for p in m.solver.parameters()) == 0;'
-                'print("reloaded", type(m).__name__, "solver params 0")',
+                ('from stable_worldmodel.wm.utils import load_pretrained;'
+                 f'm = load_pretrained("smoke_physwm_{args.benchmarks[0]}'
+                 '/weights.pt");'
+                 'assert sum(p.numel() for p in m.solver.parameters()) == 0;'
+                 'print("reloaded", type(m).__name__, "solver params 0")'),
             ],
             env,
         )

@@ -1,0 +1,39 @@
+# @package _global_
+# Serious single-H100 (80 GB) PhysWM profile. The conservative batch size
+# leaves headroom for the 2,048-token, block-causal predictor; profile one
+# epoch before increasing it to 32 on a particular H100 host.
+
+output_model_name: physwm_${bench.benchmark}_h100_seed${seed}
+device: cuda
+norm_samples: 4096
+
+trainer:
+  max_epochs: 50
+  precision: bf16
+  ckpt_every: 5
+  resume: auto
+
+loader:
+  batch_size: 16
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+
+wandb:
+  enabled: true
+  project: physwm
+  name: ${output_model_name}
+  id: ${output_model_name}
+  resume: allow
+
+bench:
+  encoder:
+    name: dinov2
+    model_name: facebook/dinov2-small
+    frozen: true
+    image_size: 224
+    patch_size: 14
+  data:
+    num_episodes: 256
+    episode_length: 64

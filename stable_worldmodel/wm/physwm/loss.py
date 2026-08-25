@@ -25,6 +25,7 @@ they are commensurate and ``alpha``/``beta`` are scale-free.
 import torch
 
 _DETACH_MODES = ('none', 'a', 'b')
+_PHYSICS_TARGETS = ('path_a', 'dataset')
 
 
 def physwm_loss(
@@ -32,6 +33,7 @@ def physwm_loss(
     alpha: float = 1.0,
     beta: float = 0.0,
     consistency_detach: str = 'none',
+    physics_target: str = 'path_a',
 ) -> dict:
     """Compute the composite objective and its diagnostics.
 
@@ -45,6 +47,11 @@ def physwm_loss(
             ``'a'`` -- detach Path A. Redundant with ``L_B`` (both become
             ``(a.detach() - b)^2``); kept only so the consistency term can
             be swept independently of ``alpha``. Inert while ``beta == 0``.
+        physics_target:
+            ``'path_a'`` (default) is the workshop method: Path B learns
+            from Path A's stopped-gradient, high-signal prediction.
+            ``'dataset'`` directly targets ``s_next`` and exists only as
+            the target-source ablation.
 
     Returns:
         dict with ``loss`` plus every component, detached for logging.
@@ -52,19 +59,35 @@ def physwm_loss(
     assert consistency_detach in _DETACH_MODES, (
         f'consistency_detach must be one of {_DETACH_MODES}'
     )
+    assert physics_target in _PHYSICS_TARGETS, (
+        f'physics_target must be one of {_PHYSICS_TARGETS}'
+    )
 
+    mask = out.get('state_loss_mask')
     a, b, target = out['state_a'], out['state_b'], out['target']
+    if mask is not None:
+        a, b, target = a[..., mask], b[..., mask], target[..., mask]
 
     # --- A regresses the dataset ground truth ----------------------------
     loss_a = (a - target).pow(2).mean()
+    time_mask = out.get('physics_loss_mask')
+    if time_mask is not None:
+        a_phys = a[:, time_mask]
+        b_phys = b[:, time_mask]
+        target_phys = target[:, time_mask]
+    else:
+        a_phys, b_phys, target_phys = a, b, target
     # --- B regresses Path A's (detached) prediction, not the benchmark ---
     # label: the physics probe is fit to explain the WM's general belief
-    # about the next state. Detaching means A gets no gradient from this
-    # term -- it stays purely anchored to `target`.
-    loss_b = (b - a.detach()).pow(2).mean()
+    # about the next state. Detaching blocks the teacher/decoder edge; the
+    # shared predictor is still shaped deliberately through B's probe input.
+    teacher = (
+        a_phys.detach() if physics_target == 'path_a' else target_phys
+    )
+    loss_b = (b_phys - teacher).pow(2).mean()
 
-    a_c = a.detach() if consistency_detach == 'a' else a
-    b_c = b.detach() if consistency_detach == 'b' else b
+    a_c = a_phys.detach() if consistency_detach == 'a' else a_phys
+    b_c = b_phys.detach() if consistency_detach == 'b' else b_phys
     loss_consistency = (a_c - b_c).pow(2).mean()
 
     loss = loss_a + alpha * loss_b + beta * loss_consistency
@@ -81,17 +104,14 @@ def physwm_loss(
 def physwm_metrics(out: dict, solver=None) -> dict:
     """Diagnostics logged alongside the loss.
 
-    * per-path RMSE in physical units (interpretable, unlike the
-      normalized loss);
+    * per-path RMSE in normalized state units;
     * theta summary statistics per named parameter.
 
-    ``rmse_a`` and ``rmse_b`` are scored against each path's own training
-    target (dataset ``s_next`` for A, Path A's detached prediction for B)
-    so they track the losses being optimized. ``rmse_b_vs_dataset`` is an
-    extra, non-training diagnostic: how physically accurate the solver's
-    output is against the real ``s_next``, even though nothing in the loss
-    pushes it there directly -- useful to see whether fitting the physics
-    path to the WM's own belief also keeps it grounded in reality.
+    ``rmse_a`` uses all transitions. Path-B metrics use the held-out query
+    mask when a context/query split is configured: ``rmse_b`` is fidelity
+    to Path A and ``rmse_b_vs_dataset`` is accuracy against real ``s_next``.
+    They are evaluation diagnostics, not necessarily the transitions used
+    by the physical training loss.
 
     The identifiability certificate (:func:`theta_r2`) is deliberately
     NOT computed here: R^2 is only meaningful over a sample in which the
@@ -100,10 +120,17 @@ def physwm_metrics(out: dict, solver=None) -> dict:
     epoch and call :func:`theta_r2` once instead.
     """
     metrics = {}
-    tgt = out['target']
-    metrics['rmse_a'] = (out['state_a'] - tgt).pow(2).mean().sqrt()
-    metrics['rmse_b'] = (out['state_b'] - out['state_a']).pow(2).mean().sqrt()
-    metrics['rmse_b_vs_dataset'] = (out['state_b'] - tgt).pow(2).mean().sqrt()
+    mask = out.get('state_loss_mask')
+    tgt, a, b = out['target'], out['state_a'], out['state_b']
+    if mask is not None:
+        tgt, a, b = tgt[..., mask], a[..., mask], b[..., mask]
+    metrics['rmse_a'] = (a - tgt).pow(2).mean().sqrt()
+    time_mask = out.get('physics_eval_mask')
+    if time_mask is not None:
+        tgt, a, b = tgt[:, time_mask], a[:, time_mask], b[:, time_mask]
+    metrics['rmse_b'] = (b - a).pow(2).mean().sqrt()
+    metrics['rmse_b_vs_teacher'] = metrics['rmse_b']
+    metrics['rmse_b_vs_dataset'] = (b - tgt).pow(2).mean().sqrt()
 
     theta = out['theta']
     flat = theta.reshape(-1, theta.shape[-1])

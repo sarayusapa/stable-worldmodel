@@ -1,0 +1,44 @@
+# @package _global_
+# Serious single-RTX-4090 (24 GB) PhysWM profile. Measured 2026-08-25 on the
+# local 4090: batch 32 with the frozen DINOv2-small/224px encoder peaks at
+# ~3.7 GB of 24 GB, so no gradient accumulation is needed. Raise batch_size
+# further if a bigger encoder or longer window is swapped in.
+
+output_model_name: physwm_${bench.benchmark}_rtx4090_seed${seed}
+device: cuda
+norm_samples: 4096
+
+trainer:
+  max_epochs: 50
+  precision: bf16
+  accumulate_grad_batches: 1
+  ckpt_every: 5
+  resume: auto
+
+loader:
+  batch_size: 32
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+
+# Offline logging makes an unattended local launch independent of credentials.
+# Run `wandb sync` on the resulting directory whenever convenient.
+wandb:
+  enabled: true
+  project: physwm
+  name: ${output_model_name}
+  mode: offline
+  id: ${output_model_name}
+  resume: allow
+
+bench:
+  encoder:
+    name: dinov2
+    model_name: facebook/dinov2-small
+    frozen: true
+    image_size: 224
+    patch_size: 14
+  data:
+    num_episodes: 128
+    episode_length: 64

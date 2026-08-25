@@ -4,6 +4,9 @@
 # Rendering needs a GL backend: export MUJOCO_GL=egl
 benchmark: cartpole
 
+probe_source: predicted # use `encoded` only for the pre-action ablation
+probe_context: 4
+physics_loss_scope: context
 probe_frames: context
 solver_state_source: gt
 

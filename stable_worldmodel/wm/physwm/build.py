@@ -26,7 +26,12 @@ BENCHMARKS = {
     # poked disc; ground-truth theta available -> identifiability certificate
     'pokeworld': {
         'solver': 'pokeworld',
-        'state_dim': 4,
+        # [x, y, vx, vy, touch] -- touch is the contact-force peak that
+        # makes mass/stiffness/drag individually identifiable
+        'state_dim': 5,
+        # fed to the encoder as an extra token: the pixels are identical
+        # across theta, so without it the probe cannot resolve k, m and c
+        'tactile_index': 4,
         'action_dim': 2,
         'has_theta_true': True,
     },
@@ -79,6 +84,24 @@ def build_physwm(cfg, state_dim: int, action_dim: int) -> PhysWM:
     encoder = build_encoder(enc_cfg, state_dim)
     embed_dim = encoder.embed_dim
     num_tokens = encoder.num_tokens
+    # an extra token per frame carries the tactile reading (see PhysWM);
+    # the benchmark declares which state channel it is
+    benchmark_tactile_index = BENCHMARKS[cfg['benchmark']].get('tactile_index')
+    tactile_index = benchmark_tactile_index
+    tactile_enabled = cfg.get('tactile', {}).get('enabled', True)
+    if tactile_enabled and tactile_index is not None:
+        num_tokens += 1
+    else:
+        tactile_index = None
+    loss_state_indices = cfg.get('loss_state_indices')
+    if (
+        loss_state_indices is None
+        and benchmark_tactile_index is not None
+        and not tactile_enabled
+    ):
+        loss_state_indices = tuple(
+            i for i in range(state_dim) if i != benchmark_tactile_index
+        )
     obs_key = 'state' if enc_cfg['name'] == 'state' else 'pixels'
 
     solver = build_solver(
@@ -130,6 +153,7 @@ def build_physwm(cfg, state_dim: int, action_dim: int) -> PhysWM:
         dropout=probe_cfg.get('dropout', 0.0),
         detach_input=probe_cfg.get('detach_input', False),
         init_scale=probe_cfg.get('init_scale', 0.01),
+        tactile_tokens=1 if tactile_index is not None else 0,
     )
     probe.init_from_solver(solver)
 
@@ -144,7 +168,15 @@ def build_physwm(cfg, state_dim: int, action_dim: int) -> PhysWM:
         action_dim=action_dim,
         obs_key=obs_key,
         probe_frames=cfg.get('probe_frames', 'context'),
+        # Missing only in historical checkpoints, whose actual route was
+        # pre-action `encoded`. New experiment configs always set this field.
+        probe_source=cfg.get('probe_source', 'encoded'),
+        probe_context=cfg.get('probe_context'),
+        physics_loss_scope=cfg.get('physics_loss_scope', 'all'),
         solver_state_source=cfg.get('solver_state_source', 'gt'),
+        tactile_index=tactile_index,
+        tactile_embed_dim=embed_dim,
+        loss_state_indices=loss_state_indices,
     )
 
 
@@ -174,13 +206,13 @@ def build_episodes(cfg, seed: int):
         )
         return train, val
 
-    kwargs = dict(
-        env_id=spec['env_id'],
-        length=d['episode_length'],
-        frameskip=d.get('frameskip', 1),
-        image_size=cfg['encoder'].get('image_size', 64),
-        render=render,
-    )
+    kwargs = {
+        'env_id': spec['env_id'],
+        'length': d['episode_length'],
+        'frameskip': d.get('frameskip', 1),
+        'image_size': cfg['encoder'].get('image_size', 64),
+        'render': render,
+    }
     train = env_episodes(num_episodes=d['num_episodes'], seed=seed, **kwargs)
     val = env_episodes(
         num_episodes=max(1, d['num_episodes'] // 4),
@@ -195,9 +227,18 @@ def build_datasets(cfg, seed: int):
     train_eps, val_eps = build_episodes(cfg, seed)
     window = cfg['data']['window']
     stride = cfg['data'].get('stride', 1)
+    dataset_kwargs = {
+        'window': window,
+        'stride': stride,
+        'context': cfg.get('probe_context'),
+        'require_context_touch': (
+            cfg['data'].get('require_context_touch', False)
+            and cfg.get('tactile', {}).get('enabled', True)
+        ),
+    }
     return (
-        EpisodeWindowDataset(train_eps, window=window, stride=stride),
-        EpisodeWindowDataset(val_eps, window=window, stride=stride),
+        EpisodeWindowDataset(train_eps, **dataset_kwargs),
+        EpisodeWindowDataset(val_eps, **dataset_kwargs),
     )
 
 

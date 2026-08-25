@@ -28,16 +28,15 @@
 This repo is home to an ongoing experiment, **PhysWM**, that asks a narrow
 question: when a world model already predicts its own general next state,
 can a small, physics-parameterized model be probed *out of the same
-latent* to explain that prediction — rather than being fit directly to
-whatever the benchmark happened to record?
+action-conditioned predictive latent* to explain that prediction — rather
+than being fit directly to whatever the benchmark happened to record?
 
-Two next-state predictions branch off one encoder latent `z`:
+Two next-state predictions branch off one predictive latent `ẑ`:
 
 ```
-                     ┌── predictor ──► ẑ ── decoder ─────────────► s_A   (learned, ← s_next)
-pixels ── encoder ──►│
-                (z)  └── probe ──► θ ──► frozen physics solver ──► s_B   (physical, ← s_A.detach())
-                                          (s_t, a_t, θ)
+pixels ─► encoder ─► z ─► predictor(z, a) ─► ẑ ─┬─► decoder ─────────────► s_A   (learned, ← s_next)
+                                                 └─► probe ─► θ ─► solver ─► s_B   (physical, ← s_A.detach())
+                                                                 (s_t, a_t, θ)
 
 L = L_A + α·L_B + β·L_consistency          (β = 0 by default)
 ```
@@ -45,7 +44,8 @@ L = L_A + α·L_B + β·L_consistency          (β = 0 by default)
 - **Path A (learned)** is the general-purpose next-state prediction: latent
   in, latent predicted forward, decoded to state. It is supervised on the
   dataset's actual `s_next` — it has to stay anchored to reality.
-- **Path B (physical)** reads a low-capacity probe off the same latent to
+- **Path B (physical)** reads a low-capacity probe off the same
+  action-conditioned predictive latent to
   emit `θ`, a vector of physics parameters (mass, gains, stiffness, ...),
   and runs it through a **frozen, differentiable, zero-parameter** physics
   solver to produce an independent next-state estimate.
@@ -69,11 +69,11 @@ right, can a low-capacity, physically-constrained probe recover the
 compact physical parameterization *underneath* it? That's filling in the
 hierarchy — using the general prediction the model is already decent at as
 the training signal for the physics-aware latent structure it hasn't
-learned on its own. The detach keeps this one-directional — Path A gets no
-gradient back from `L_B`, so fitting the physics path never drags the
-learned prediction toward the solver; the pressure runs one way, from the
-general prediction onto the physics probe, the same direction as the
-hierarchy itself.
+learned on its own. The detach fixes Path A's output as the teacher value:
+`L_B` cannot optimize the decoder through the target edge. Its gradient does,
+deliberately, reach the shared predictor through the probe input, which is how
+the physical loss induces structure in `ẑ`. Detaching that input is the
+post-hoc-probe ablation.
 
 `θ` is always a forward-pass output of the probe — never a free variable
 fitted directly to a target — so gradients into the probe only ever arrive
@@ -99,6 +99,7 @@ python scripts/smoke/validate_solvers.py  # solver adequacy diagnostic
 python scripts/train/physwm.py bench=pokeworld
 python scripts/train/physwm.py bench=cartpole trainer.max_epochs=50
 python scripts/train/physwm.py bench=pusht loss.alpha=0.5 loss.beta=0.1
+python scripts/eval/overnight.py --dry-run  # inspect the workshop matrix
 
 # Serious H100 profile: DINOv2-small at 224px, BF16, 256 episodes, 50 epochs
 python scripts/train/physwm.py bench=cartpole hardware=h100 seed=0

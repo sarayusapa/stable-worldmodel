@@ -4,6 +4,9 @@
 # Action is the relative action in [-1,1]^2, scaled by 100 into a target.
 benchmark: pusht
 
+probe_source: predicted # use `encoded` only for the pre-action ablation
+probe_context: 4
+physics_loss_scope: context
 probe_frames: context
 solver_state_source: gt
 

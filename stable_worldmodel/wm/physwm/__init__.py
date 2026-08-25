@@ -1,6 +1,6 @@
 """PhysWM: a physics-grounded world model prototype.
 
-Two next-state predictions from the same DINO-WM latent -- one learned
+Two next-state predictions from the same action-conditioned DINO-WM latent -- one learned
 (latent prediction decoded to state), one physical (probe -> theta ->
 frozen differentiable solver). The learned path is supervised on the
 dataset's ground-truth next state; the physical path is supervised on the

@@ -146,8 +146,8 @@ def main():
     ap.add_argument('--seed', type=int, default=0)
     args = ap.parse_args()
     # must match the transition interval of each environment
-    args.dt = {'pokeworld': 0.01, 'cartpole': 0.01, 'pusht': 0.01}
-    args.substeps = {'pokeworld': 10, 'cartpole': 2, 'pusht': 10}
+    args.dt = {'pokeworld': 0.001, 'cartpole': 0.01, 'pusht': 0.01}
+    args.substeps = {'pokeworld': 20, 'cartpole': 2, 'pusht': 10}
 
     results = {b: report(b, args) for b in args.benchmarks}
 

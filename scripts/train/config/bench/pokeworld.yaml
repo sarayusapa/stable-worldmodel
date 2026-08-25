@@ -1,15 +1,28 @@
 # PokeWorld -- the identifiability benchmark.
 # Ground-truth theta is known per episode, so the probe is scored with an
-# R^2 certificate. mass/stiffness/drag only enter as ratios, so they are
-# NOT individually identifiable by construction -- that is the point.
+# R^2 certificate. Ranges and observability follow the reference PokeWorld:
+# mass 0.5-3, stiffness 500-6000, drag 0.5-4, rendered identically. The
+# state's `touch` channel (contact-force peak) is what makes the three
+# individually identifiable rather than only as k/m and c/m ratios.
 benchmark: pokeworld
 
-# probe pools over the frames the solver steps FROM, so it never sees the
-# target frame it is scored against
+# The workshop method probes the same action-conditioned latent decoded by
+# Path A. `encoded` is retained only as the pre-action routing ablation.
+probe_source: predicted
+# infer persistent theta through index 4; fit on completed transitions 0..3
+# and report only held-out transitions 4..6 in the default 8-frame window
+probe_context: 4
+physics_loss_scope: context
+# Legacy temporal selection used only when probe_context is null.
 probe_frames: context
 # 'gt' feeds the solver the dataset state (isolates theta estimation);
 # 'decoded' feeds it the decoder's read-out of the current latent
 solver_state_source: gt
+
+# Raw mass/stiffness/drag are separately identifiable only with touch.
+# Set false for the visual-only condition and score k/m and c/m instead.
+tactile:
+  enabled: true
 
 encoder:
   name: tiny_cnn # tiny_cnn | dinov2 | state
@@ -33,7 +46,14 @@ predictor:
 decoder:
   hidden_dim: 256
   depth: 2
-  pool: mean
+  # flatten, not mean: the encoder carries position in WHICH token is
+  # active, and mean-pooling over patches is permutation-invariant, so it
+  # averages the position away. Measured with a supervised read-out of the
+  # current state: x error 0.46 (mean) vs 0.10 (flatten). PokeWorld's
+  # state IS position, so this matters more here than anywhere else.
+  # NOTE: with dinov2 (256 tokens x 384 dim) flatten makes a very wide
+  # first layer -- keep mean, or add an attention pool, for that encoder.
+  pool: flatten
 
 probe:
   hidden_dim: 0 # 0 = single linear map (lowest-capacity probe)
@@ -45,12 +65,19 @@ probe:
 
 solver:
   name: pokeworld
-  dt: 0.01 # matches PokeWorldSim: 10 substeps x 0.01s per transition
-  substeps: 10
+  # matches PokeWorldSim: 20 substeps x 0.001s. The fine substep is
+  # required by the reference stiffness range (500-6000): with k/m up to
+  # 1.2e4, omega*dt must stay well under 1 for the contact to integrate
+  # stably, and the sub-step resolution is what exposes the tactile peak.
+  dt: 0.001
+  substeps: 20
 
 data:
   num_episodes: 64
   episode_length: 64
   window: 8
   stride: 1
+  # Raw-parameter identification needs at least one completed contact in
+  # context. The visual-only evaluator disables this hidden-modality filter.
+  require_context_touch: true
   sim: {} # PokeWorldSim overrides, e.g. drag_exponent for mismatch

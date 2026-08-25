@@ -8,8 +8,8 @@ config without touching the training loop:
   backbone, frozen), ``StateEncoder`` (state-input ablation).
 * **Predictor** ``(z, a) -> z_hat`` block-causal spatio-temporal ViT, the
   DINO-WM predictor.
-* **StateDecoder** ``z -> s`` -- Path A's read-out head.
-* **ThetaProbe** ``z -> raw theta`` -- Path B's read-out head, deliberately
+* **StateDecoder** ``z_hat -> s`` -- Path A's read-out head.
+* **ThetaProbe** ``z_hat -> raw theta`` -- Path B's read-out head, deliberately
   low capacity.
 """
 
@@ -232,7 +232,7 @@ class DinoWMPredictor(nn.Module):
         return frame.unsqueeze(0) <= frame.unsqueeze(1)
 
     def forward(self, z, act_emb):
-        B, T, N, D = z.shape
+        B, T, N, _ = z.shape
         assert T <= self.max_frames, (
             f'{T} frames exceeds max_frames={self.max_frames}'
         )
@@ -333,13 +333,26 @@ class ThetaProbe(nn.Module):
         dropout: float = 0.0,
         detach_input: bool = False,
         init_scale: float = 0.01,
+        tactile_tokens: int = 0,
     ):
         super().__init__()
         assert mode in ('episode', 'step'), f'bad probe mode {mode!r}'
+        assert 0 <= tactile_tokens < num_tokens, (
+            f'tactile_tokens {tactile_tokens} outside num_tokens {num_tokens}'
+        )
         self.mode = mode
         self.pool = pool
         self.detach_input = detach_input
-        dim = _pooled_dim(embed_dim, num_tokens, pool)
+        self.tactile_tokens = tactile_tokens
+        # Tactile tokens get their OWN pathway instead of being averaged in
+        # with the observation tokens. Pooling all N together would give the
+        # tactile reading a 1/N share of a linear probe's input -- with 16
+        # pixel tokens that is ~6%, and it is the only token carrying the
+        # information that separates stiffness from mass and drag. Keeping
+        # it separate makes it half the input while leaving the probe
+        # low-capacity.
+        dim = _pooled_dim(embed_dim, num_tokens - tactile_tokens, pool)
+        dim += embed_dim * tactile_tokens
 
         if hidden_dim and hidden_dim > 0:
             self.net = nn.Sequential(
@@ -365,14 +378,40 @@ class ThetaProbe(nn.Module):
         with torch.no_grad():
             self.net[-1].bias.copy_(solver.nominal_raw())
 
-    def forward(self, z):
-        """``(B, T, N, D)`` -> ``(B, K)`` (episode) or ``(B, T, K)``."""
+    def features(self, z):
+        """Return the exact low-capacity feature consumed by the probe.
+
+        Keeping this operation public makes the paper's supervised
+        decodability control use precisely the same representation and
+        pooling as the unsupervised probe.  In particular, tactile tokens
+        retain their dedicated pathway instead of being accidentally
+        averaged into the visual tokens by evaluation code.
+        """
         if self.detach_input:
             z = z.detach()
-        h = _pool_tokens(z, self.pool)
+        if self.tactile_tokens:
+            k = self.tactile_tokens
+            obs, tac = z[:, :, :-k], z[:, :, -k:]
+            h = torch.cat(
+                [
+                    _pool_tokens(obs, self.pool),
+                    rearrange(tac, 'b t n d -> b t (n d)'),
+                ],
+                dim=-1,
+            )
+        else:
+            h = _pool_tokens(z, self.pool)
         if self.mode == 'episode':
             h = h.mean(dim=1)
-        return self.net(h)
+        return h
+
+    def forward(self, z):
+        """``(B, T, N, D)`` -> ``(B, K)`` (episode) or ``(B, T, K)``.
+
+        Any tactile tokens are the LAST ``tactile_tokens`` entries along the
+        token axis (see ``PhysWM.encode``); they bypass pooling.
+        """
+        return self.net(self.features(z))
 
 
 __all__ = [

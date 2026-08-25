@@ -1,7 +1,8 @@
 """Train PhysWM: a physics-grounded world model with two next-state paths.
 
-    Path A (learned)   z -> predictor -> z_hat -> decoder      -> s_A
-    Path B (physical)  z -> probe -> theta -> frozen solver    -> s_B
+    z_hat = predictor(z, action)
+    Path A (learned)   z_hat -> decoder                         -> s_A
+    Path B (physical)  z_hat -> probe -> theta -> frozen solver -> s_B
 
     L = L_A + alpha * L_B + beta * L_consistency
 
@@ -24,11 +25,17 @@ runnable without the training extra. Config, seeding, W&B logging and
 checkpointing follow the same conventions as the rest of the repo.
 """
 
+import hashlib
 import json
 import logging
 import math
+import os
+import platform
 import random
+import subprocess
 import sys
+from contextlib import nullcontext
+from datetime import datetime, timezone
 from pathlib import Path
 
 import hydra
@@ -70,42 +77,159 @@ def lr_at(step: int, total: int, warmup: int, base_lr: float) -> float:
     return base_lr * 0.5 * (1.0 + math.cos(math.pi * min(1.0, progress)))
 
 
-def to_device(batch, device):
+def to_device(batch, device, non_blocking=False):
     return {
-        k: v.to(device) if torch.is_tensor(v) else v for k, v in batch.items()
+        k: v.to(device, non_blocking=non_blocking) if torch.is_tensor(v) else v
+        for k, v in batch.items()
     }
+
+
+def autocast_context(device, precision):
+    """Return the configured mixed-precision context.
+
+    BF16 is intentionally the only mixed mode exposed here: it is native on
+    H100, has FP32-like range, and does not require gradient scaling.
+    """
+    precision = str(precision).lower()
+    if precision in {'32', 'fp32', '32-true'}:
+        return nullcontext()
+    if precision in {'bf16', 'bf16-mixed'}:
+        if device.type != 'cuda':
+            raise ValueError('BF16 training requires a CUDA device')
+        return torch.autocast(device_type='cuda', dtype=torch.bfloat16)
+    raise ValueError(
+        f'unsupported precision {precision!r}; choose fp32 or bf16'
+    )
+
+
+def atomic_torch_save(obj, path):
+    """Write a checkpoint atomically on the run directory filesystem."""
+    path = Path(path)
+    tmp = path.with_suffix(path.suffix + '.tmp')
+    torch.save(obj, tmp)
+    tmp.replace(path)
+
+
+# keys that define the EXPERIMENT. Two runs that differ in any of these are
+# different experiments and must not resume from each other's checkpoint.
+# Everything else (max_epochs, device, dataloader perf knobs, wandb, resume
+# itself) may legitimately change when continuing a run.
+_FINGERPRINT_KEYS = (
+    'seed',
+    'deterministic',
+    'norm_samples',
+    'bench',
+    'loss',
+    'optimizer',
+)
+_FINGERPRINT_TRAINER_KEYS = (
+    'grad_clip',
+    'warmup_frac',
+    'accumulate_grad_batches',
+    'precision',
+)
+
+
+def config_fingerprint(cfg) -> str:
+    """Stable hash of the experiment-defining parts of the config."""
+    payload = {k: OmegaConf.to_container(cfg[k], resolve=True)
+               if OmegaConf.is_config(cfg[k]) else cfg[k]
+               for k in _FINGERPRINT_KEYS}
+    payload['trainer'] = {
+        k: cfg.trainer[k] for k in _FINGERPRINT_TRAINER_KEYS
+    }
+    blob = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
+def git_state():
+    """Commit sha and dirtiness, or ``None`` outside a git checkout."""
+    root = Path(__file__).resolve().parents[2]
+    try:
+        sha = subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], cwd=root, text=True,
+            stderr=subprocess.DEVNULL).strip()
+        dirty = bool(subprocess.check_output(
+            ['git', 'status', '--porcelain'], cwd=root, text=True,
+            stderr=subprocess.DEVNULL).strip())
+        return {'commit': sha, 'dirty': dirty}
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return None
+
+
+def run_metadata(cfg, device) -> dict:
+    """Everything needed to reproduce and to log this run in progress.md."""
+    meta = {
+        'timestamp_utc': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+        'command': ' '.join(sys.argv),
+        'hostname': platform.node(),
+        'python': sys.executable,
+        'torch': torch.__version__,
+        'torch_cuda': torch.version.cuda,
+        'device': str(device),
+        'fingerprint': config_fingerprint(cfg),
+        'git': git_state(),
+        'env': {
+            k: os.environ[k]
+            for k in ('MUJOCO_GL', 'CUDA_VISIBLE_DEVICES')
+            if k in os.environ
+        },
+    }
+    if device.type == 'cuda' and torch.cuda.is_available():
+        meta['gpu'] = torch.cuda.get_device_name(device)
+    return meta
 
 
 def run_epoch(model, loader, cfg, device, optimizer=None, scheduler=None):
     """One pass. ``optimizer=None`` -> evaluation."""
     train = optimizer is not None
+    accumulate = int(cfg.trainer.get('accumulate_grad_batches', 1))
+    if accumulate < 1:
+        raise ValueError('trainer.accumulate_grad_batches must be >= 1')
     model.train(train)
     totals, count = {}, 0
     # theta is accumulated over the WHOLE epoch: the identifiability R^2
     # is only meaningful across many episodes, never within one minibatch
-    theta_pred, theta_true = [], []
+    theta_pred, theta_true, theta_episode = [], [], []
 
-    for batch in loader:
-        batch = to_device(batch, device)
-        with torch.set_grad_enabled(train):
+    if train:
+        optimizer.zero_grad(set_to_none=True)
+
+    for batch_idx, batch in enumerate(loader):
+        batch = to_device(
+            batch,
+            device,
+            non_blocking=bool(cfg.loader.get('pin_memory', False)),
+        )
+        with (
+            torch.set_grad_enabled(train),
+            autocast_context(device, cfg.trainer.precision),
+        ):
             out = model(batch)
             losses = physwm_loss(
                 out,
                 alpha=cfg.loss.alpha,
                 beta=cfg.loss.beta,
                 consistency_detach=cfg.loss.consistency_detach,
+                physics_target=cfg.loss.physics_target,
             )
 
         if train:
-            optimizer.zero_grad(set_to_none=True)
-            losses['loss'].backward()
-            if cfg.trainer.grad_clip:
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), cfg.trainer.grad_clip
-                )
-            optimizer.step()
-            if scheduler is not None:
-                scheduler()
+            group_start = (batch_idx // accumulate) * accumulate
+            group_size = min(accumulate, len(loader) - group_start)
+            (losses['loss'] / group_size).backward()
+            end_of_group = (
+                batch_idx + 1
+            ) % accumulate == 0 or batch_idx + 1 == len(loader)
+            if end_of_group:
+                if cfg.trainer.grad_clip:
+                    torch.nn.utils.clip_grad_norm_(
+                        model.parameters(), cfg.trainer.grad_clip
+                    )
+                optimizer.step()
+                optimizer.zero_grad(set_to_none=True)
+                if scheduler is not None:
+                    scheduler()
 
         metrics = physwm_metrics(out, solver=model.solver)
         if 'theta_true' in batch:
@@ -114,6 +238,7 @@ def run_epoch(model, loader, cfg, device, optimizer=None, scheduler=None):
                 theta = theta.mean(dim=1)
             theta_pred.append(theta.detach().cpu())
             theta_true.append(batch['theta_true'].detach().cpu())
+            theta_episode.append(batch['episode'].detach().cpu())
         merged = {**{k: v.detach() for k, v in losses.items()}, **metrics}
         bs = batch['state'].shape[0]
         for k, v in merged.items():
@@ -122,12 +247,20 @@ def run_epoch(model, loader, cfg, device, optimizer=None, scheduler=None):
 
     stats = {k: v / max(1, count) for k, v in totals.items()}
     if theta_pred:
+        pred = torch.cat(theta_pred)
+        true = torch.cat(theta_true)
+        episode = torch.cat(theta_episode)
+        pred_ep, true_ep = [], []
+        for ep in episode.unique(sorted=True):
+            keep = episode == ep
+            pred_ep.append(pred[keep].mean(0))
+            true_ep.append(true[keep][0])
         stats.update(
             {
                 k: float(v)
                 for k, v in theta_r2(
-                    torch.cat(theta_pred),
-                    torch.cat(theta_true),
+                    torch.stack(pred_ep),
+                    torch.stack(true_ep),
                     model.solver.theta_names,
                 ).items()
             }
@@ -153,19 +286,27 @@ def run(cfg):
     log.info(f'windows: train={len(train_set)} val={len(val_set)}')
 
     gen = torch.Generator().manual_seed(cfg.seed)
+    loader_kwargs = {
+        'batch_size': cfg.loader.batch_size,
+        'num_workers': cfg.loader.num_workers,
+        'pin_memory': cfg.loader.pin_memory,
+    }
+    if cfg.loader.num_workers > 0:
+        loader_kwargs.update(
+            persistent_workers=cfg.loader.persistent_workers,
+            prefetch_factor=cfg.loader.prefetch_factor,
+        )
     train_loader = DataLoader(
         train_set,
-        batch_size=cfg.loader.batch_size,
         shuffle=True,
-        num_workers=cfg.loader.num_workers,
         drop_last=len(train_set) > cfg.loader.batch_size,
         generator=gen,
+        **loader_kwargs,
     )
     val_loader = DataLoader(
         val_set,
-        batch_size=cfg.loader.batch_size,
         shuffle=False,
-        num_workers=cfg.loader.num_workers,
+        **loader_kwargs,
     )
 
     # ---------------- model ----------------
@@ -182,7 +323,10 @@ def run(cfg):
     optimizer = torch.optim.AdamW(
         trainable, lr=cfg.optimizer.lr, weight_decay=cfg.optimizer.wd
     )
-    total_steps = cfg.trainer.max_epochs * max(1, len(train_loader))
+    optimizer_steps_per_epoch = math.ceil(
+        len(train_loader) / cfg.trainer.accumulate_grad_batches
+    )
+    total_steps = cfg.trainer.max_epochs * max(1, optimizer_steps_per_epoch)
     warmup = max(1, int(cfg.trainer.warmup_frac * total_steps))
     state = {'step': 0}
 
@@ -191,18 +335,6 @@ def run(cfg):
         lr = lr_at(state['step'], total_steps, warmup, cfg.optimizer.lr)
         for group in optimizer.param_groups:
             group['lr'] = lr
-
-    # ---------------- logging ----------------
-    wandb_run = None
-    if cfg.wandb.enabled:
-        import wandb
-
-        wandb_run = wandb.init(
-            project=cfg.wandb.project,
-            name=cfg.wandb.name,
-            mode=cfg.wandb.mode,
-            config=OmegaConf.to_container(cfg, resolve=True),
-        )
 
     run_dir = Path(
         swm.data.utils.get_cache_dir(sub_folder='checkpoints'),
@@ -223,10 +355,76 @@ def run(cfg):
     with open(run_dir / 'config.json', 'w') as f:
         json.dump(ckpt_config, f, indent=2)
 
-    # ---------------- train ----------------
+    # provenance: commit, env, exact command. Written every run so a result
+    # can always be traced back without relying on shell history.
+    meta = run_metadata(cfg, device)
+    with open(run_dir / 'run_meta.json', 'w') as f:
+        json.dump(meta, f, indent=2)
+    git = meta['git']
+    log.info(
+        f'run {cfg.output_model_name} | fingerprint {meta["fingerprint"]} | '
+        f'git {git["commit"][:9] if git else "n/a"}'
+        f'{"+dirty" if git and git["dirty"] else ""}'
+    )
+
+    # ---------------- resume ----------------
     best = float('inf')
     history = []
-    for epoch in range(cfg.trainer.max_epochs):
+    start_epoch = 0
+    resume = cfg.trainer.get('resume')
+    if resume:
+        resume_path = (
+            run_dir / 'last.pt' if str(resume) == 'auto' else Path(resume)
+        )
+        if resume_path.exists():
+            checkpoint = torch.load(
+                resume_path, map_location=device, weights_only=False
+            )
+            saved_fp = checkpoint.get('fingerprint')
+            if saved_fp is not None and saved_fp != meta['fingerprint']:
+                raise RuntimeError(
+                    f'refusing to resume {resume_path}: it was written by a '
+                    f'different experiment (fingerprint {saved_fp} != '
+                    f'{meta["fingerprint"]}). The seed, benchmark, loss or '
+                    f'optimizer settings changed. Use a different '
+                    f'output_model_name, or set trainer.resume=null to start '
+                    f'fresh.'
+                )
+            model.load_state_dict(checkpoint['model'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            start_epoch = int(checkpoint['epoch']) + 1
+            best = float(checkpoint['best'])
+            history = checkpoint['history']
+            state['step'] = int(checkpoint['scheduler_step'])
+            log.info(
+                f'resumed {resume_path} at epoch {start_epoch} '
+                f'(optimizer step {state["step"]})'
+            )
+        elif str(resume) != 'auto':
+            raise FileNotFoundError(
+                f'resume checkpoint not found: {resume_path}'
+            )
+        else:
+            log.info(f'no checkpoint at {resume_path}; starting fresh')
+
+    # ---------------- logging ----------------
+    wandb_run = None
+    if cfg.wandb.enabled:
+        import wandb
+
+        wandb_kwargs = {
+            'project': cfg.wandb.project,
+            'name': cfg.wandb.name,
+            'mode': cfg.wandb.mode,
+            'config': OmegaConf.to_container(cfg, resolve=True),
+        }
+        if cfg.wandb.get('id'):
+            wandb_kwargs['id'] = cfg.wandb.id
+            wandb_kwargs['resume'] = cfg.wandb.resume
+        wandb_run = wandb.init(**wandb_kwargs)
+
+    # ---------------- train ----------------
+    for epoch in range(start_epoch, cfg.trainer.max_epochs):
         train_stats = run_epoch(
             model, train_loader, cfg, device, optimizer, scheduler
         )
@@ -267,10 +465,22 @@ def run(cfg):
         if is_best:
             best = val_stats['loss']
         if is_best or (epoch + 1) % cfg.trainer.ckpt_every == 0:
-            torch.save(
+            atomic_torch_save(
                 model.state_dict(),
                 run_dir / ('weights.pt' if is_best else f'ep{epoch + 1}.pt'),
             )
+        atomic_torch_save(
+            {
+                'epoch': epoch,
+                'fingerprint': meta['fingerprint'],
+                'model': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'scheduler_step': state['step'],
+                'best': best,
+                'history': history,
+            },
+            run_dir / 'last.pt',
+        )
 
     with open(run_dir / 'history.json', 'w') as f:
         json.dump(history, f, indent=2)
@@ -284,4 +494,4 @@ def run(cfg):
 
 
 if __name__ == '__main__':
-    sys.exit(0 if run() is not None else 0)
+    run()

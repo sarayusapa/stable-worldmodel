@@ -3,8 +3,15 @@
 defaults:
   - _self_
   - bench: pokeworld
+  # Optional machine-specific overrides, e.g. `hardware=h100`.
+  - hardware: null
 
-output_model_name: physwm_${bench.benchmark}
+# Includes the seed so parallel seeds never share a run directory. Any
+# OTHER override that defines a distinct experiment (loss.alpha, a probe
+# setting, ...) must also get its own name -- pass output_model_name
+# explicitly when sweeping. The resume guard in physwm.py catches the
+# mistake if you forget, rather than silently mixing two runs.
+output_model_name: physwm_${bench.benchmark}_seed${seed}
 seed: 0
 deterministic: true
 device: auto
@@ -13,6 +20,9 @@ norm_samples: 512
 
 loss:
   alpha: 1.0 # weight on the physics path L_B
+  # Workshop method: train B on Path A's stopped-gradient prediction.
+  # `dataset` is the target-source ablation, never the default.
+  physics_target: path_a
   beta: 0.0 # consistency ||A - solver(theta)||^2, OFF by default
   # 'none' keeps consistency symmetric. 'a' would make it a supervision
   # of B on A, which violates the design rule; opt-in ablation only.
@@ -21,12 +31,20 @@ loss:
 trainer:
   max_epochs: 30
   grad_clip: 1.0
+  accumulate_grad_batches: 1
   warmup_frac: 0.05
   ckpt_every: 10
+  precision: fp32
+  # null starts fresh; `auto` resumes <run_dir>/last.pt when it exists;
+  # an explicit path resumes that training-state checkpoint.
+  resume: null
 
 loader:
   batch_size: 32
   num_workers: 0
+  pin_memory: false
+  persistent_workers: false
+  prefetch_factor: 2
 
 optimizer:
   lr: 3e-4
@@ -37,3 +55,5 @@ wandb:
   project: physwm
   name: null
   mode: online
+  id: null
+  resume: allow

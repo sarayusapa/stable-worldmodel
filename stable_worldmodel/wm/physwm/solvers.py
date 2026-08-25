@@ -58,7 +58,7 @@ class PhysicsSolver(nn.Module):
     theta_names: tuple[str, ...] = ()
     action_dim: int = 0
 
-    def __init__(self, dt: float = 0.01, substeps: int = 10):
+    def __init__(self, dt: float = 0.01, substeps: int = 10, **kwargs):
         super().__init__()
         assert substeps >= 1, 'substeps must be >= 1'
         self.dt = float(dt)
@@ -223,20 +223,23 @@ class PokeWorldSolver(PhysicsSolver):
 
         m * v_dot = k_contact * penetration * n_hat - c_drag * v
 
-    State ``[x, y, vx, vy]``; action ``[poker_x, poker_y]``.
+    State ``[x, y, vx, vy, touch]``; action ``[poker_x, poker_y]``.
+    ``touch`` is ``log1p(peak contact force)`` over the sub-steps of the
+    transition, matching :class:`PokeWorldSim`.
 
-    Identifiability note (deliberate, and the point of this benchmark):
-    only the *ratios* ``k_contact / m`` and ``c_drag / m`` affect the
-    trajectory, so ``m``, ``k_contact`` and ``c_drag`` are **not**
-    individually identifiable from state transitions alone. The probe can
-    only ever recover a 2-d manifold of this 3-d theta. Evaluation reports
-    per-parameter and per-ratio R^2 so this shows up explicitly rather
-    than being hidden -- the same "ratio-type dynamics stay unlearned"
-    effect the reference repo reports.
+    Identifiability: from motion alone the dynamics depend only on
+    ``k/m`` and ``c/m``, so mass, stiffness and drag would be recoverable
+    only up to a 2-d manifold. The ``touch`` channel breaks that
+    degeneracy the way the reference PokeWorld does -- the contact peak
+    pins ``k``, the contact impulse against the resulting velocity change
+    pins ``m``, and decay during free glide pins ``c``. The radii remain
+    constant by construction, so their R^2 is undefined (reported `nan`).
     """
 
-    state_names = ('x', 'y', 'vx', 'vy')
+    state_names = ('x', 'y', 'vx', 'vy', 'touch')
     action_dim = 2
+    #: arena half-width; must match ``PokeWorldSim.world_size``
+    world_size = 1.0
     theta_names = (
         'mass',
         'contact_stiffness',
@@ -246,32 +249,65 @@ class PokeWorldSolver(PhysicsSolver):
     )
 
     def default_bounds(self):
-        #      m     k       c      r_p   r_o
-        lo = [0.10, 1.0, 0.00, 0.02, 0.02]
-        hi = [5.00, 500.0, 10.00, 0.50, 0.50]
-        nom = [1.00, 50.0, 1.00, 0.10, 0.10]
+        # brackets the reference sampling ranges (m 0.5-3, k 500-6000,
+        # c 0.5-4) with headroom, so a bounded probe can reach them
+        #      m     k        c      r_p   r_o
+        lo = [0.10, 100.0, 0.00, 0.02, 0.02]
+        hi = [6.00, 8000.0, 10.00, 0.50, 0.50]
+        nom = [1.50, 1500.0, 2.00, 0.10, 0.10]
         return lo, hi, nom
 
-    def step(self, state, action, p, dt):
-        pos, vel = state[..., :2], state[..., 2:]
-        poker = action[..., :2]
-
+    def _contact_force(self, pos, poker, p):
         delta = pos - poker
         dist = delta.norm(dim=-1).clamp_min(1e-6)
         # soft, one-sided contact: zero force outside the contact radius
         overlap = torch.relu(p['poker_radius'] + p['object_radius'] - dist)
         normal = delta / dist.unsqueeze(-1)
-        f_contact = (
+        return (
             p['contact_stiffness'].unsqueeze(-1)
             * overlap.unsqueeze(-1)
             * normal
         )
+
+    def step(self, state, action, p, dt):
+        pos, vel, touch = state[..., :2], state[..., 2:4], state[..., 4]
+        poker = action[..., :2]
+
+        f_contact = self._contact_force(pos, poker, p)
         f_drag = -p['drag'].unsqueeze(-1) * vel
         acc = (f_contact + f_drag) / p['mass'].unsqueeze(-1)
 
         vel = vel + dt * acc
         pos = pos + dt * vel
-        return torch.cat([pos, vel], dim=-1)
+        # elastic walls, matching PokeWorldSim exactly (same order of
+        # operations, same sub-step): reflect position, flip velocity
+        w = self.world_size
+        over = pos - pos.clamp(-w, w)
+        pos = pos - 2.0 * over
+        vel = torch.where(over != 0.0, -vel, vel)
+        # running peak over the transition; forward() seeds it at zero
+        touch = torch.maximum(touch, f_contact.norm(dim=-1))
+        return torch.cat([pos, vel, touch.unsqueeze(-1)], dim=-1)
+
+    def forward(self, state, action, theta):
+        """Integrate one transition, reporting the PEAK contact force.
+
+        The touch channel is an observable of the transition, not a
+        dynamical state, so it is reset to zero before integrating and
+        accumulated as a running max across sub-steps. The incoming
+        ``state[..., 4]`` (last transition's peak) is deliberately
+        ignored -- carrying it forward would make touch depend on history
+        it has no physical dependence on.
+        """
+        state = torch.cat(
+            [state[..., :4], torch.zeros_like(state[..., 4:5])], dim=-1
+        )
+        out = super().forward(state, action, theta)
+        # report log1p(peak force), matching PokeWorldSim: the raw peak is
+        # zero-inflated with a huge dynamic range and makes a poor target
+        return torch.cat(
+            [out[..., :4], torch.log1p(out[..., 4:5])], dim=-1
+        )
 
 
 class PushTSolver(PhysicsSolver):
