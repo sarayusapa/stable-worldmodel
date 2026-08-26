@@ -355,13 +355,6 @@ def pusht_randomized_episodes(
             ep['pixels'] = np.stack(frames).transpose(0, 3, 1, 2)
         episodes.append(ep)
     env.close()
-
-    _FETCH_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    tmp_path = cache_path.with_suffix('.tmp')
-    with open(tmp_path, 'wb') as f:
-        pickle.dump(episodes, f)
-    tmp_path.replace(cache_path)  # atomic: no other process sees a partial file
-
     return episodes, None
 
 
@@ -509,6 +502,73 @@ def fetch_episodes(
     return episodes, None
 
 
+def _cartpole_episodes_subprocess(
+    num_episodes, length, seed, frameskip, image_size, render,
+    batch_size=64, max_attempts=None, batch_timeout=300,
+):
+    """Collect cartpole episodes via repeated calls to
+    ``_cartpole_batch_worker.py``, isolating the native-SIGABRT risk (see
+    that script's docstring) in a throwaway subprocess per batch.
+
+    Each attempt asks for up to ``batch_size`` new episodes at a fresh,
+    never-before-tried seed range; whatever the worker managed to flush to
+    disk before dying (if it died) is kept, and only the shortfall is
+    retried. Seeds always advance rather than repeat, since a crash is a
+    property of the random action sequence a seed draws, not something a
+    bare retry at the same seed would avoid.
+    """
+    import pickle
+    import shutil
+    import subprocess
+    import sys
+    import tempfile
+
+    worker = str(
+        Path(__file__).resolve().parents[3]
+        / 'scripts' / 'eval' / '_cartpole_batch_worker.py'
+    )
+    if max_attempts is None:
+        max_attempts = max(20, (num_episodes // batch_size + 1) * 4)
+
+    tmp_root = Path(tempfile.mkdtemp(prefix='cartpole_eps_'))
+    collected = []
+    next_seed = seed
+    attempt = 0
+    try:
+        while len(collected) < num_episodes and attempt < max_attempts:
+            attempt += 1
+            want = min(batch_size, num_episodes - len(collected))
+            out_dir = tmp_root / f'batch_{attempt}'
+            cmd = [
+                sys.executable, worker,
+                '--start-seed', str(next_seed), '--count', str(want),
+                '--length', str(length), '--frameskip', str(frameskip),
+                '--image-size', str(image_size), '--out-dir', str(out_dir),
+            ]
+            if render:
+                cmd.append('--render')
+            try:
+                subprocess.run(cmd, timeout=batch_timeout, capture_output=True)
+            except subprocess.TimeoutExpired:
+                pass
+            for p in sorted(out_dir.glob('ep_*.pkl')) if out_dir.exists() else []:
+                with open(p, 'rb') as f:
+                    collected.append(pickle.load(f))
+            next_seed += want * 1000  # clear of every seed just tried, hit or miss
+
+        if len(collected) < num_episodes:
+            print(
+                f"[env_episodes] cartpole: only collected "
+                f"{len(collected)}/{num_episodes} episodes after {attempt} "
+                f"subprocess attempts (worker kept crashing); proceeding "
+                f"with what we have"
+            )
+    finally:
+        shutil.rmtree(tmp_root, ignore_errors=True)
+
+    return collected[:num_episodes]
+
+
 def env_episodes(
     env_id: str,
     num_episodes: int,
@@ -530,12 +590,25 @@ def env_episodes(
     dm_control envs need a GL backend for rendering (``MUJOCO_GL=egl``);
     PushT needs a headless SDL driver, which is set below.
     """
+    is_cartpole = 'Cartpole' in env_id
+    is_pusht = 'PushT' in env_id
+
+    if is_cartpole:
+        # A single unstable action sequence anywhere in the rollout can
+        # trip a native SIGABRT deep inside mj_step (see
+        # _cartpole_batch_worker.py's docstring) -- not a Python
+        # exception, so it cannot be caught here. Every cartpole episode
+        # is therefore collected in a disposable subprocess instead of
+        # in-process: a crash there costs one retried batch, not this
+        # whole run.
+        return _cartpole_episodes_subprocess(
+            num_episodes, length, seed, frameskip, image_size, render
+        )
+
     import gymnasium as gym
 
     import stable_worldmodel  # noqa: F401  (registers the swm/* ids)
 
-    is_cartpole = 'Cartpole' in env_id
-    is_pusht = 'PushT' in env_id
     if is_pusht:
         os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 
@@ -552,11 +625,7 @@ def env_episodes(
         obs, _ = env.reset(seed=int(seed + ep_i))
         states, actions, frames = [], [], []
         for _ in range(length):
-            s = (
-                _cartpole_state(env)
-                if is_cartpole
-                else np.asarray(obs['state'], dtype=np.float32)
-            )
+            s = np.asarray(obs['state'], dtype=np.float32)
             if policy is not None:
                 a = policy(s)
             else:
@@ -566,11 +635,7 @@ def env_episodes(
             states.append(s)
             actions.append(a)
             if render:
-                frame = (
-                    env.unwrapped.render(width=image_size, height=image_size)
-                    if is_cartpole
-                    else env.render()
-                )
+                frame = env.render()
                 frame = _resize(np.asarray(frame), image_size)
                 frames.append(np.asarray(frame, dtype=np.float32) / 255.0)
 
