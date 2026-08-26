@@ -9,7 +9,13 @@ rather than through fragile config interpolation.
 
 from stable_worldmodel.wm.lewm.module import Embedder
 
-from .data import EpisodeWindowDataset, env_episodes, pokeworld_episodes
+from .data import (
+    EpisodeWindowDataset,
+    env_episodes,
+    fetch_episodes,
+    pokeworld_episodes,
+    pusht_randomized_episodes,
+)
 from .module import (
     DinoV2Encoder,
     DinoWMPredictor,
@@ -42,6 +48,25 @@ BENCHMARKS = {
         'action_dim': 1,
         'env_id': 'swm/CartpoleDMControl-v0',
         'has_theta_true': False,
+    },
+    # Fetch Push: planar contact-push with per-episode mass/friction,
+    # the 2-parameter case (no clean stiffness analog in the Fetch XML --
+    # contact softness there is a solver param, not a material property)
+    'fetch_push': {
+        'solver': 'fetch_push',
+        'state_dim': 6,
+        'action_dim': 4,
+        'env_id': 'swm/FetchPush-v3',
+        'has_theta_true': True,
+    },
+    # PushT with per-episode physics: k_p/k_v are recorded as ground
+    # truth because PushTSolver reproduces the agent's PD law exactly
+    'pusht_rand': {
+        'solver': 'pusht',
+        'state_dim': 7,
+        'action_dim': 2,
+        'env_id': 'swm/PushT-v1',
+        'has_theta_true': True,
     },
     # PushT; state = [agent_xy, block_xy, block_angle, block_vel_xy]
     'pusht': {
@@ -154,6 +179,9 @@ def build_physwm(cfg, state_dim: int, action_dim: int) -> PhysWM:
         detach_input=probe_cfg.get('detach_input', False),
         init_scale=probe_cfg.get('init_scale', 0.01),
         tactile_tokens=1 if tactile_index is not None else 0,
+        quantize=probe_cfg.get('quantize', False),
+        num_codes=probe_cfg.get('num_codes', 64),
+        commitment_beta=probe_cfg.get('commitment_beta', 0.25),
     )
     probe.init_from_solver(solver)
 
@@ -204,6 +232,34 @@ def build_episodes(cfg, seed: int):
             image_size=cfg['encoder'].get('image_size', 64),
             **d.get('sim', {}),
         )
+        return train, val
+
+    if name == 'pusht_rand':
+        train = pusht_randomized_episodes(
+            num_episodes=d['num_episodes'], length=d['episode_length'],
+            seed=seed, frameskip=d.get('frameskip', 1),
+            image_size=cfg['encoder'].get('image_size', 64), render=render,
+        )[0]
+        val = pusht_randomized_episodes(
+            num_episodes=max(1, d['num_episodes'] // 4),
+            length=d['episode_length'], seed=seed + 10_000,
+            frameskip=d.get('frameskip', 1),
+            image_size=cfg['encoder'].get('image_size', 64), render=render,
+        )[0]
+        return train, val
+
+    if name == 'fetch_push':
+        train = fetch_episodes(
+            num_episodes=d['num_episodes'], length=d['episode_length'],
+            seed=seed, frameskip=d.get('frameskip', 1),
+            image_size=cfg['encoder'].get('image_size', 64), render=render,
+        )[0]
+        val = fetch_episodes(
+            num_episodes=max(1, d['num_episodes'] // 4),
+            length=d['episode_length'], seed=seed + 10_000,
+            frameskip=d.get('frameskip', 1),
+            image_size=cfg['encoder'].get('image_size', 64), render=render,
+        )[0]
         return train, val
 
     kwargs = {

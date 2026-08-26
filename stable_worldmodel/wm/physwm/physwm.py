@@ -335,6 +335,9 @@ class PhysWM(nn.Module):
         z_probe = self.select_probe_latent(z, z_hat)
         theta_raw = self.probe(z_probe)
         theta = self.solver.bound_theta(theta_raw)
+        # cached by ThetaProbe.forward when probe.quantizer is enabled;
+        # None (the default) means "no VQ term to add" for physwm_loss
+        vq_loss = getattr(self.probe, 'last_vq_loss', None)
 
         if self.solver_state_source == 'gt':
             s_cur = state[:, :-1]
@@ -366,6 +369,7 @@ class PhysWM(nn.Module):
             'state_loss_mask': self.state_loss_mask,
             'physics_loss_mask': physics_loss_mask,
             'physics_eval_mask': physics_eval_mask,
+            'vq_loss': vq_loss,
         }
 
     # ------------------------------------------------------------------

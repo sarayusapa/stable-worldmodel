@@ -474,8 +474,111 @@ class PushTSolver(PhysicsSolver):
         )
 
 
+class FetchPushSolver(PhysicsSolver):
+    """Planar contact-push dynamics for Fetch Push/Slide, 2nd-order in the
+    object so mass is genuinely identifiable (unlike a quasi-static block
+    model, where the object has no inertia and mass cannot appear at all).
+
+    State is a reduced planar projection of Fetch's own MuJoCo state::
+
+        [gripper_x, gripper_y, object_x, object_y, object_vx, object_vy]
+
+    (z is dropped: Push/Slide keep the gripper closed and the object on the
+    table plane, so out-of-plane motion is not part of the phenomenon being
+    identified.)
+
+    Action is Fetch's own 4-d continuous action ``[dx, dy, dz, gripper]``;
+    only ``dx, dy`` drive this planar model (``dz``/``gripper`` are held
+    closed throughout Push/Slide, matching the environment's own expert
+    policy, so they carry no planar-dynamics information and are ignored
+    here -- the same kind of documented simplification as PushTSolver's
+    disc-approximated T-block).
+
+    The gripper is treated as **kinematic** (its own high-gain joint
+    controller tracks the commanded delta essentially exactly at this
+    timescale), so its motion is parameter-free. The object is a true
+    Newtonian point mass pushed by a soft-contact spring and opposed by a
+    linear (viscous) friction term::
+
+        m * dv/dt = F_contact - friction * v
+
+    ``friction`` is therefore modelled the same way as PokeWorld's `drag`
+    -- a linear damping coefficient, not a Coulomb/normal-force friction
+    law -- which is the standard tractable approximation and is stated
+    here explicitly rather than left implicit. Contact stiffness and both
+    object/gripper contact radii are fixed, non-identified constants (this
+    benchmark's claim is deliberately the 2-parameter case: mass and
+    friction only), unlike PushTSolver/PokeWorldSolver which also identify
+    contact stiffness and/or geometry.
+    """
+
+    state_names = (
+        'gripper_x', 'gripper_y', 'object_x', 'object_y',
+        'object_vx', 'object_vy',
+    )
+    action_dim = 4
+    theta_names = ('mass', 'friction')
+
+    def __init__(
+        self,
+        dt: float = 0.01,
+        substeps: int = 10,
+        action_scale: float = 0.05,
+        agent_radius: float = 0.02,
+        object_radius: float = 0.025,
+        contact_stiffness: float = 400.0,
+    ):
+        # env/geometry conventions, not physics to be identified -> constants
+        self.action_scale = float(action_scale)
+        self.agent_radius = float(agent_radius)
+        self.object_radius = float(object_radius)
+        self.contact_stiffness = float(contact_stiffness)
+        super().__init__(dt=dt, substeps=substeps)
+
+    def default_bounds(self):
+        # matches FetchWrapper's variation_space ranges exactly
+        # (fetch.py: block.mass low=0.01,high=50.0; block.friction
+        # low=0.05,high=2.0) -- these must stay in sync, since a solver
+        # bound narrower than what's actually sampled saturates
+        # bound_theta's sigmoid on real episodes instead of spanning them.
+        #      mass     friction
+        lo = [0.01, 0.05]
+        hi = [50.00, 2.00]
+        nom = [2.00, 1.00]
+        return lo, hi, nom
+
+    def step(self, state, action, p, dt):
+        gripper = state[..., 0:2]
+        obj = state[..., 2:4]
+        obj_vel = state[..., 4:6]
+
+        # --- gripper: kinematic, parameter-free (fast joint control)
+        gripper = gripper + action[..., 0:2] * self.action_scale
+
+        # --- contact: soft penetration spring, fixed stiffness/geometry
+        delta = obj - gripper
+        dist = delta.norm(dim=-1).clamp_min(1e-6)
+        overlap = torch.relu(
+            self.agent_radius + self.object_radius - dist
+        )
+        normal = delta / dist.unsqueeze(-1)
+        force = self.contact_stiffness * overlap.unsqueeze(-1) * normal
+
+        # --- object: true 2nd-order dynamics (mass gives it inertia,
+        # friction is a linear velocity-damping term -- both causally
+        # separable, same structure as PokeWorldSolver's mass/drag)
+        mass = p['mass'].unsqueeze(-1).clamp_min(1e-6)
+        friction = p['friction'].unsqueeze(-1)
+        acc = force / mass - friction * obj_vel / mass
+        obj_vel = obj_vel + dt * acc
+        obj = obj + dt * obj_vel
+
+        return torch.cat([gripper, obj, obj_vel], dim=-1)
+
+
 SOLVERS = {
     'cartpole': CartpoleSolver,
+    'fetch_push': FetchPushSolver,
     'pokeworld': PokeWorldSolver,
     'pusht': PushTSolver,
 }

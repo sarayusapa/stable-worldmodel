@@ -63,6 +63,1752 @@ Copy this block for each new run.
 
 ## Log
 
+
+### 2026-08-25 16:32 — [Data-floor sweep (episode-budget scaling)] `encoder_free_floor` (2048ep re-run, logged post hoc)
+
+- **Params:** ``
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `encoder_free_floor.json`
+
+### 2026-08-25 18:24 — [Data-floor sweep (episode-budget scaling)] `encoder_free_pooled` (2048ep re-run, logged post hoc)
+
+- **Params:** ``
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `encoder_free_pooled.json`
+
+### 2026-08-25 17:47 — [Data-floor sweep (episode-budget scaling)] `floor_ep1024_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=1024, length=48, epochs=60, alpha=1.0, seed=0, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep1024_seed0.json`, `floor_ep1024_seed0.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.7232 | -0.8913 | 0.6825 | -1.5882 | 0.7244 | 0.7160 |
+| drag | -0.3190 | -6.2787 | -0.2495 | -0.0462 | -0.3383 | -0.3184 |
+| mass | 0.1051 | -0.3162 | 0.1065 | -0.0664 | 0.0212 | 0.0019 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -0.2267 | -5.3517 | -0.0838 | -0.0625 | -0.2705 | -0.1519 |
+| stiffness_over_mass | 0.1950 | -0.3127 | 0.2927 | -0.7666 | 0.2618 | 0.2698 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.3496 | 0.3368 | 0.3745 |
+| path_a_vs_dataset | 0.4155 | 0.3919 | 0.4247 |
+| path_b_vs_dataset | 0.0989 | 0.1521 | 0.0879 |
+| path_b_vs_teacher | 0.3403 | 0.3556 | 0.3785 |
+| persistence_query_vs_dataset | 0.4035 | 0.4035 | 0.4035 |
+| persistence_vs_dataset | 0.5477 | 0.5477 | 0.5477 |
+
+### 2026-08-25 17:54 — [Data-floor sweep (episode-budget scaling)] `floor_ep1024_seed1` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=1024, length=48, epochs=60, alpha=1.0, seed=1, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep1024_seed1.json`, `floor_ep1024_seed1.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.7419 | -0.0436 | 0.6476 | -1.1063 | 0.7067 | 0.6992 |
+| drag | -0.3096 | -2.7381 | -0.3780 | -0.0023 | -0.3954 | -0.4051 |
+| mass | 0.0554 | -0.0363 | 0.0966 | 0.0004 | -0.1567 | -0.1039 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -0.1003 | -1.2580 | -0.1659 | -0.0415 | -0.2805 | -0.1313 |
+| stiffness_over_mass | 0.2551 | 0.0087 | 0.3909 | -0.5633 | 0.3005 | 0.2974 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.2349 | 0.2380 | 0.2519 |
+| path_a_vs_dataset | 0.3062 | 0.2899 | 0.3150 |
+| path_b_vs_dataset | 0.0720 | 0.1252 | 0.0542 |
+| path_b_vs_teacher | 0.2365 | 0.2543 | 0.2520 |
+| persistence_query_vs_dataset | 0.2920 | 0.2920 | 0.2920 |
+| persistence_vs_dataset | 0.4697 | 0.4697 | 0.4697 |
+
+### 2026-08-25 17:55 — [Data-floor sweep (episode-budget scaling)] `floor_ep1024_seed2` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=1024, length=48, epochs=60, alpha=1.0, seed=2, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep1024_seed2.json`, `floor_ep1024_seed2.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.6092 | -0.0648 | 0.7297 | -1.2150 | 0.7116 | 0.7032 |
+| drag | -0.3427 | -3.2403 | -0.2401 | -0.0210 | -0.3469 | -0.3997 |
+| mass | -0.1769 | -0.5183 | -0.0582 | -0.1091 | -0.0989 | -0.1381 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -0.2420 | -3.9145 | -0.1858 | -0.0143 | -0.1883 | -0.1979 |
+| stiffness_over_mass | 0.0678 | 0.0714 | 0.3070 | -0.5665 | 0.2882 | 0.2408 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.2766 | 0.2586 | 0.3343 |
+| path_a_vs_dataset | 0.3430 | 0.3294 | 0.3780 |
+| path_b_vs_dataset | 0.0743 | 0.1331 | 0.0605 |
+| path_b_vs_teacher | 0.2792 | 0.2806 | 0.3387 |
+| persistence_query_vs_dataset | 0.2966 | 0.2966 | 0.2966 |
+| persistence_vs_dataset | 0.4818 | 0.4818 | 0.4818 |
+
+### 2026-08-25 16:10 — [Data-floor sweep (episode-budget scaling)] `floor_ep128_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=128, length=48, epochs=60, alpha=1.0, seed=0, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep128_seed0.json`, `floor_ep128_seed0.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | -0.4886 | -1.5930 | -1.6134 | -1.9439 | 0.4101 | 0.3753 |
+| drag | -2.1424 | -0.8026 | -4.3619 | -0.0300 | -0.7063 | -0.6608 |
+| mass | -3.0514 | -0.6045 | -2.9662 | 0.0376 | -0.6938 | -0.5579 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -4.5131 | -1.6761 | -5.3761 | -0.1488 | -1.0380 | -0.7295 |
+| stiffness_over_mass | -1.2183 | -0.5051 | -0.7568 | -0.6920 | -0.0125 | -0.0615 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.7910 | 0.7850 | 0.8113 |
+| path_a_vs_dataset | 0.8269 | 0.8061 | 0.8719 |
+| path_b_vs_dataset | 0.1826 | 0.2083 | 0.1350 |
+| path_b_vs_teacher | 0.8061 | 0.8140 | 0.8262 |
+| persistence_query_vs_dataset | 0.6913 | 0.6913 | 0.6913 |
+| persistence_vs_dataset | 0.7667 | 0.7667 | 0.7667 |
+
+### 2026-08-25 16:13 — [Data-floor sweep (episode-budget scaling)] `floor_ep128_seed1` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=128, length=48, epochs=60, alpha=1.0, seed=1, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep128_seed1.json`, `floor_ep128_seed1.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | -0.8049 | -1.4297 | -0.6111 | -2.6292 | -0.4245 | -0.3348 |
+| drag | -2.6542 | -0.4921 | -2.8617 | -0.0577 | -0.6072 | -0.5143 |
+| mass | -1.5469 | -0.2439 | -0.7499 | -0.1513 | -0.2590 | -0.2988 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -1.3851 | -0.5624 | -2.0399 | -0.0831 | -0.2149 | -0.0686 |
+| stiffness_over_mass | -1.8904 | -0.2465 | -2.0295 | -0.9664 | -0.0968 | -0.1359 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.7347 | 0.6948 | 0.7801 |
+| path_a_vs_dataset | 0.7924 | 0.7410 | 0.7821 |
+| path_b_vs_dataset | 0.0760 | 0.1267 | 0.0485 |
+| path_b_vs_teacher | 0.7125 | 0.6749 | 0.7735 |
+| persistence_query_vs_dataset | 0.4770 | 0.4770 | 0.4770 |
+| persistence_vs_dataset | 0.5928 | 0.5928 | 0.5928 |
+
+### 2026-08-25 16:11 — [Data-floor sweep (episode-budget scaling)] `floor_ep128_seed2` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=128, length=48, epochs=60, alpha=1.0, seed=2, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep128_seed2.json`, `floor_ep128_seed2.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | -1.0723 | -2.2404 | 0.0247 | -2.1679 | -0.0847 | -0.1347 |
+| drag | -1.7116 | -4.1468 | -3.5469 | -0.0436 | -0.5730 | -0.3663 |
+| mass | -0.9319 | -1.5052 | -0.6205 | -0.1742 | 0.1628 | 0.1400 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -2.6329 | -10.7806 | -2.2274 | 0.0085 | -0.5115 | 0.0096 |
+| stiffness_over_mass | -0.2004 | -0.2661 | -0.0444 | -0.5763 | -0.0663 | -0.0198 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.3273 | 0.3068 | 0.3771 |
+| path_a_vs_dataset | 0.4801 | 0.4321 | 0.5222 |
+| path_b_vs_dataset | 0.1052 | 0.1408 | 0.0437 |
+| path_b_vs_teacher | 0.3072 | 0.3004 | 0.3747 |
+| persistence_query_vs_dataset | 0.2516 | 0.2516 | 0.2516 |
+| persistence_vs_dataset | 0.4803 | 0.4803 | 0.4803 |
+
+### 2026-08-25 15:59 — [Data-floor sweep (episode-budget scaling)] `floor_ep2048_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=0, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep2048_seed0.json`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.7694 | 0.1180 | 0.7396 | -1.4193 | 0.8051 | 0.8002 |
+| drag | -0.1847 | -4.9174 | -0.2499 | -0.0126 | -0.4060 | -0.4371 |
+| mass | 0.2945 | -0.1336 | 0.2459 | -0.0689 | 0.1519 | 0.1488 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | 0.0386 | -2.1030 | 0.0515 | -0.0359 | -0.0100 | -0.0266 |
+| stiffness_over_mass | 0.4607 | 0.0509 | 0.4215 | -0.6106 | 0.4547 | 0.4679 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.3608 | 0.3328 | 0.3713 |
+| path_a_vs_dataset | 0.3850 | 0.3623 | 0.3865 |
+| path_b_vs_dataset | 0.0881 | 0.1172 | 0.0750 |
+| path_b_vs_teacher | 0.3570 | 0.3426 | 0.3721 |
+| persistence_query_vs_dataset | 0.4439 | 0.4439 | 0.4439 |
+| persistence_vs_dataset | 0.5509 | 0.5509 | 0.5509 |
+
+### 2026-08-25 16:22 — [Data-floor sweep (episode-budget scaling)] `floor_ep256_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=256, length=48, epochs=60, alpha=1.0, seed=0, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep256_seed0.json`, `floor_ep256_seed0.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.0648 | -0.8953 | -0.3817 | -1.7935 | 0.1016 | 0.1043 |
+| drag | -3.4223 | -1.9542 | -1.5201 | -0.0798 | -0.1149 | -0.0423 |
+| mass | -1.5815 | -0.2795 | -1.5467 | -0.0545 | -0.6357 | -0.5429 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -2.3041 | -1.5725 | -1.7761 | -0.1072 | -0.5584 | -0.3736 |
+| stiffness_over_mass | -1.5200 | -0.3528 | -0.7292 | -0.6944 | -0.3007 | -0.1537 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.6183 | 0.5797 | 0.6165 |
+| path_a_vs_dataset | 0.6467 | 0.5907 | 0.6528 |
+| path_b_vs_dataset | 0.1028 | 0.1526 | 0.1100 |
+| path_b_vs_teacher | 0.6213 | 0.6009 | 0.6226 |
+| persistence_query_vs_dataset | 0.5244 | 0.5244 | 0.5244 |
+| persistence_vs_dataset | 0.6267 | 0.6267 | 0.6267 |
+
+### 2026-08-25 16:25 — [Data-floor sweep (episode-budget scaling)] `floor_ep256_seed1` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=256, length=48, epochs=60, alpha=1.0, seed=1, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep256_seed1.json`, `floor_ep256_seed1.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | -0.3240 | -0.3715 | -0.1502 | -1.5967 | 0.0692 | 0.0261 |
+| drag | -2.3140 | -1.2729 | -2.7243 | -0.0107 | -0.5859 | -0.9149 |
+| mass | -1.6287 | -0.2553 | -0.8585 | -0.0258 | -0.1221 | -0.0990 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -1.8314 | -1.6826 | -1.8531 | -0.0726 | -0.5526 | -0.3152 |
+| stiffness_over_mass | -0.5929 | 0.0514 | -0.8219 | -0.5512 | 0.0037 | 0.0408 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.5216 | 0.4690 | 0.5262 |
+| path_a_vs_dataset | 0.6007 | 0.5236 | 0.6111 |
+| path_b_vs_dataset | 0.1007 | 0.1087 | 0.0506 |
+| path_b_vs_teacher | 0.5068 | 0.4595 | 0.5245 |
+| persistence_query_vs_dataset | 0.3526 | 0.3526 | 0.3526 |
+| persistence_vs_dataset | 0.4972 | 0.4972 | 0.4972 |
+
+### 2026-08-25 16:23 — [Data-floor sweep (episode-budget scaling)] `floor_ep256_seed2` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=256, length=48, epochs=60, alpha=1.0, seed=2, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep256_seed2.json`, `floor_ep256_seed2.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | -0.0940 | 0.0080 | 0.1964 | -1.1868 | 0.5146 | 0.4641 |
+| drag | -3.1589 | -0.5031 | -3.9434 | -0.0173 | -0.5246 | -0.4577 |
+| mass | -1.4371 | -0.9380 | -1.1339 | -0.2430 | -0.0698 | 0.0073 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -2.1039 | -1.1139 | -3.4301 | 0.0274 | -0.3170 | -0.0387 |
+| stiffness_over_mass | -0.6616 | -0.0057 | -0.4638 | -0.4629 | 0.0558 | 0.1933 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.3869 | 0.3647 | 0.3803 |
+| path_a_vs_dataset | 0.4740 | 0.4434 | 0.4681 |
+| path_b_vs_dataset | 0.0616 | 0.1049 | 0.0653 |
+| path_b_vs_teacher | 0.3804 | 0.3721 | 0.3811 |
+| persistence_query_vs_dataset | 0.3101 | 0.3101 | 0.3101 |
+| persistence_vs_dataset | 0.4803 | 0.4803 | 0.4803 |
+
+### 2026-08-25 16:22 — [Data-floor sweep (episode-budget scaling)] `floor_ep4096_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** ``
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep4096_seed0.json`
+
+### 2026-08-25 16:47 — [Data-floor sweep (episode-budget scaling)] `floor_ep512_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=512, length=48, epochs=60, alpha=1.0, seed=0, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep512_seed0.json`, `floor_ep512_seed0.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.1551 | -0.0718 | 0.3997 | -1.5344 | 0.5987 | 0.6058 |
+| drag | -0.8053 | -1.3016 | -0.5019 | -0.0347 | -0.3612 | -0.3633 |
+| mass | -0.3991 | -0.2028 | -0.4364 | -0.0311 | -0.0985 | -0.1648 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -0.8160 | -1.4415 | -0.5487 | -0.0823 | -0.6029 | -0.4646 |
+| stiffness_over_mass | -0.3263 | 0.0237 | -0.0741 | -0.7003 | 0.1000 | 0.0962 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.4683 | 0.4384 | 0.4870 |
+| path_a_vs_dataset | 0.5400 | 0.4984 | 0.5423 |
+| path_b_vs_dataset | 0.1334 | 0.1712 | 0.0951 |
+| path_b_vs_teacher | 0.4636 | 0.4648 | 0.4953 |
+| persistence_query_vs_dataset | 0.4867 | 0.4867 | 0.4867 |
+| persistence_vs_dataset | 0.5850 | 0.5850 | 0.5850 |
+
+### 2026-08-25 17:00 — [Data-floor sweep (episode-budget scaling)] `floor_ep512_seed1` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=512, length=48, epochs=60, alpha=1.0, seed=1, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep512_seed1.json`, `floor_ep512_seed1.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.0721 | -0.0213 | 0.6198 | -1.2041 | 0.3910 | 0.3407 |
+| drag | -0.6404 | -2.9162 | -0.5760 | -0.0024 | -0.4296 | -0.4757 |
+| mass | -0.3554 | -0.2425 | -0.2299 | 0.0169 | -0.2452 | -0.2303 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -0.4835 | -2.7532 | -0.3586 | -0.0529 | -0.2867 | -0.1607 |
+| stiffness_over_mass | -0.3197 | 0.0645 | -0.0749 | -0.5802 | -0.0155 | 0.0910 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.3435 | 0.3337 | 0.3771 |
+| path_a_vs_dataset | 0.3846 | 0.3938 | 0.4332 |
+| path_b_vs_dataset | 0.0725 | 0.0941 | 0.0763 |
+| path_b_vs_teacher | 0.3392 | 0.3256 | 0.3758 |
+| persistence_query_vs_dataset | 0.3186 | 0.3186 | 0.3186 |
+| persistence_vs_dataset | 0.4701 | 0.4701 | 0.4701 |
+
+### 2026-08-25 17:00 — [Data-floor sweep (episode-budget scaling)] `floor_ep512_seed2` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=512, length=48, epochs=60, alpha=1.0, seed=2, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `floor_ep512_seed2.json`, `floor_ep512_seed2.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.4571 | 0.1861 | 0.3691 | -1.0804 | 0.3823 | 0.3590 |
+| drag | -0.7318 | -0.7455 | -1.1027 | -0.0516 | -0.4687 | -0.5407 |
+| mass | -0.6215 | -0.1606 | -0.7390 | -0.1435 | -0.5268 | -0.4617 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | -0.9939 | -0.4261 | -0.9904 | -0.0019 | -0.3514 | -0.2683 |
+| stiffness_over_mass | -0.2006 | 0.1240 | -0.1947 | -0.5450 | -0.2585 | -0.1709 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.3572 | 0.3242 | 0.3707 |
+| path_a_vs_dataset | 0.4382 | 0.4135 | 0.4555 |
+| path_b_vs_dataset | 0.1201 | 0.1262 | 0.0790 |
+| path_b_vs_teacher | 0.3639 | 0.3305 | 0.3824 |
+| persistence_query_vs_dataset | 0.2684 | 0.2684 | 0.2684 |
+| persistence_vs_dataset | 0.4657 | 0.4657 | 0.4657 |
+
+### 2026-08-25 17:18 — [Ablation (B_preaction, 2048ep)] `B_preaction_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=encoded, episodes=2048, length=48, epochs=60, alpha=1.0, seed=0, batch_size=32, tactile=True, conditions=physwm, detach_probe_input=False`
+- **Why this run:** Routing ablation: tests whether reading the SAME action-conditioned latent is necessary (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `B_preaction_seed0.json`, `B_preaction_seed0.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.1871 | -0.1974 |
+| drag | -0.0212 | -2.2610 |
+| mass | 0.1482 | -0.3228 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | 0.0656 | -1.1749 |
+| stiffness_over_mass | 0.2226 | 0.1709 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_query_vs_dataset | 0.3463 |
+| path_a_vs_dataset | 0.3726 |
+| path_b_vs_dataset | 0.0650 |
+| path_b_vs_teacher | 0.3364 |
+| persistence_query_vs_dataset | 0.4439 |
+| persistence_vs_dataset | 0.5509 |
+
+### 2026-08-25 18:21 — [Ablation (B_preaction, 2048ep)] `B_preaction_seed1` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=encoded, episodes=2048, length=48, epochs=60, alpha=1.0, seed=1, batch_size=32, tactile=True, conditions=physwm, detach_probe_input=False`
+- **Why this run:** Routing ablation: tests whether reading the SAME action-conditioned latent is necessary (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `B_preaction_seed1.json`, `B_preaction_seed1.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.1220 | -0.1013 |
+| drag | -0.0380 | -1.1193 |
+| mass | 0.0876 | -0.2596 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | 0.0406 | -0.6950 |
+| stiffness_over_mass | 0.1142 | 0.1086 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_query_vs_dataset | 0.2493 |
+| path_a_vs_dataset | 0.3272 |
+| path_b_vs_dataset | 0.0810 |
+| path_b_vs_teacher | 0.2464 |
+| persistence_query_vs_dataset | 0.3505 |
+| persistence_vs_dataset | 0.5179 |
+
+### 2026-08-25 18:33 — [Ablation (B_preaction, 2048ep)] `B_preaction_seed2` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=encoded, episodes=2048, length=48, epochs=60, alpha=1.0, seed=2, batch_size=32, tactile=True, conditions=physwm, detach_probe_input=False`
+- **Why this run:** Routing ablation: tests whether reading the SAME action-conditioned latent is necessary (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `B_preaction_seed2.json`, `B_preaction_seed2.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.1984 | -0.1542 |
+| drag | -0.0098 | -1.8867 |
+| mass | 0.0272 | -0.4996 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | 0.0392 | -1.2853 |
+| stiffness_over_mass | 0.0623 | 0.0461 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_query_vs_dataset | 0.2633 |
+| path_a_vs_dataset | 0.3168 |
+| path_b_vs_dataset | 0.0685 |
+| path_b_vs_teacher | 0.2558 |
+| persistence_query_vs_dataset | 0.3552 |
+| persistence_vs_dataset | 0.5150 |
+
+### 2026-08-25 17:19 — [Ablation (C_dataset_target, 2048ep)] `C_dataset_target_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=0, batch_size=32, tactile=True, conditions=state_target, detach_probe_input=False`
+- **Why this run:** Target ablation: replaces the model prediction with the raw state label while keeping the solver/route fixed (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `C_dataset_target_seed0.json`, `C_dataset_target_seed0.log`
+
+**theta recovery — val R²**
+
+| param | state_target/decodable | state_target/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.8623 | 0.8307 |
+| drag | -0.1277 | -0.0628 |
+| mass | 0.3286 | 0.2112 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | state_target/decodable | state_target/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | 0.1701 | 0.2205 |
+| stiffness_over_mass | 0.5793 | 0.5986 |
+
+**prediction and distillation — val RMSE**
+
+| metric | state_target |
+| --- | --- |
+| path_a_query_vs_dataset | 0.3419 |
+| path_a_vs_dataset | 0.3640 |
+| path_b_vs_dataset | 0.0756 |
+| path_b_vs_teacher | 0.3425 |
+| persistence_query_vs_dataset | 0.4439 |
+| persistence_vs_dataset | 0.5509 |
+
+### 2026-08-25 18:21 — [Ablation (C_dataset_target, 2048ep)] `C_dataset_target_seed1` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=1, batch_size=32, tactile=True, conditions=state_target, detach_probe_input=False`
+- **Why this run:** Target ablation: replaces the model prediction with the raw state label while keeping the solver/route fixed (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `C_dataset_target_seed1.json`, `C_dataset_target_seed1.log`
+
+**theta recovery — val R²**
+
+| param | state_target/decodable | state_target/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.8671 | 0.8156 |
+| drag | -0.1287 | -0.0816 |
+| mass | 0.2764 | 0.2280 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | state_target/decodable | state_target/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | 0.0754 | 0.0871 |
+| stiffness_over_mass | 0.5121 | 0.5485 |
+
+**prediction and distillation — val RMSE**
+
+| metric | state_target |
+| --- | --- |
+| path_a_query_vs_dataset | 0.2550 |
+| path_a_vs_dataset | 0.3336 |
+| path_b_vs_dataset | 0.0357 |
+| path_b_vs_teacher | 0.2542 |
+| persistence_query_vs_dataset | 0.3505 |
+| persistence_vs_dataset | 0.5179 |
+
+### 2026-08-25 18:31 — [Ablation (C_dataset_target, 2048ep)] `C_dataset_target_seed2` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=2, batch_size=32, tactile=True, conditions=state_target, detach_probe_input=False`
+- **Why this run:** Target ablation: replaces the model prediction with the raw state label while keeping the solver/route fixed (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `C_dataset_target_seed2.json`, `C_dataset_target_seed2.log`
+
+**theta recovery — val R²**
+
+| param | state_target/decodable | state_target/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.8589 | 0.8068 |
+| drag | -0.1208 | -0.1112 |
+| mass | 0.2453 | 0.2239 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | state_target/decodable | state_target/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | 0.1122 | 0.0532 |
+| stiffness_over_mass | 0.4862 | 0.4513 |
+
+**prediction and distillation — val RMSE**
+
+| metric | state_target |
+| --- | --- |
+| path_a_query_vs_dataset | 0.2681 |
+| path_a_vs_dataset | 0.3246 |
+| path_b_vs_dataset | 0.0560 |
+| path_b_vs_teacher | 0.2663 |
+| persistence_query_vs_dataset | 0.3552 |
+| persistence_vs_dataset | 0.5150 |
+
+### 2026-08-25 17:17 — [Ablation (C_posthoc, 2048ep)] `C_posthoc_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=0, batch_size=32, tactile=True, conditions=physwm, detach_probe_input=True`
+- **Why this run:** Induction ablation: representation induction vs fitting only a post-hoc probe on a latent the physics loss cannot shape (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `C_posthoc_seed0.json`, `C_posthoc_seed0.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.7633 | 0.3674 |
+| drag | -0.1507 | -5.8536 |
+| mass | 0.2820 | -0.5761 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | 0.1053 | -5.3378 |
+| stiffness_over_mass | 0.4881 | 0.3448 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_query_vs_dataset | 0.3594 |
+| path_a_vs_dataset | 0.3865 |
+| path_b_vs_dataset | 0.0669 |
+| path_b_vs_teacher | 0.3505 |
+| persistence_query_vs_dataset | 0.4439 |
+| persistence_vs_dataset | 0.5509 |
+
+### 2026-08-25 18:21 — [Ablation (C_posthoc, 2048ep)] `C_posthoc_seed1` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=1, batch_size=32, tactile=True, conditions=physwm, detach_probe_input=True`
+- **Why this run:** Induction ablation: representation induction vs fitting only a post-hoc probe on a latent the physics loss cannot shape (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `C_posthoc_seed1.json`, `C_posthoc_seed1.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.7706 | 0.3653 |
+| drag | -0.0524 | -5.8046 |
+| mass | 0.2080 | -0.1039 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | 0.0991 | -2.3272 |
+| stiffness_over_mass | 0.4177 | 0.3648 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_query_vs_dataset | 0.2557 |
+| path_a_vs_dataset | 0.3325 |
+| path_b_vs_dataset | 0.0753 |
+| path_b_vs_teacher | 0.2505 |
+| persistence_query_vs_dataset | 0.3505 |
+| persistence_vs_dataset | 0.5179 |
+
+### 2026-08-25 18:32 — [Ablation (C_posthoc, 2048ep)] `C_posthoc_seed2` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=2, batch_size=32, tactile=True, conditions=physwm, detach_probe_input=True`
+- **Why this run:** Induction ablation: representation induction vs fitting only a post-hoc probe on a latent the physics loss cannot shape (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `C_posthoc_seed2.json`, `C_posthoc_seed2.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.7615 | 0.2838 |
+| drag | -0.1523 | -4.1354 |
+| mass | 0.2232 | -0.3178 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | -0.0191 | -2.7526 |
+| stiffness_over_mass | 0.3918 | 0.2570 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_query_vs_dataset | 0.2622 |
+| path_a_vs_dataset | 0.3161 |
+| path_b_vs_dataset | 0.0643 |
+| path_b_vs_teacher | 0.2575 |
+| persistence_query_vs_dataset | 0.3552 |
+| persistence_vs_dataset | 0.5150 |
+
+### 2026-08-25 17:17 — [Ablation (G_probe_mlp, 2048ep)] `G_probe_mlp_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=0, batch_size=32, tactile=True, conditions=physwm, detach_probe_input=False`
+- **Why this run:** Probe capacity ablation: checks the result is not an artifact of the linear probe (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `G_probe_mlp_seed0.json`, `G_probe_mlp_seed0.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.7686 | 0.1838 |
+| drag | -0.1231 | -8.5023 |
+| mass | 0.2280 | -0.3584 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | 0.0256 | -5.1968 |
+| stiffness_over_mass | 0.3807 | 0.2154 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_query_vs_dataset | 0.3412 |
+| path_a_vs_dataset | 0.3762 |
+| path_b_vs_dataset | 0.0836 |
+| path_b_vs_teacher | 0.3337 |
+| persistence_query_vs_dataset | 0.4439 |
+| persistence_vs_dataset | 0.5509 |
+
+### 2026-08-25 18:22 — [Ablation (G_probe_mlp, 2048ep)] `G_probe_mlp_seed1` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=1, batch_size=32, tactile=True, conditions=physwm, detach_probe_input=False`
+- **Why this run:** Probe capacity ablation: checks the result is not an artifact of the linear probe (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `G_probe_mlp_seed1.json`, `G_probe_mlp_seed1.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.7766 | -0.0421 |
+| drag | -0.1030 | -4.5643 |
+| mass | 0.1095 | -0.3816 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | -0.0474 | -3.5046 |
+| stiffness_over_mass | 0.4131 | 0.1521 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_query_vs_dataset | 0.2664 |
+| path_a_vs_dataset | 0.3401 |
+| path_b_vs_dataset | 0.0684 |
+| path_b_vs_teacher | 0.2675 |
+| persistence_query_vs_dataset | 0.3505 |
+| persistence_vs_dataset | 0.5179 |
+
+### 2026-08-25 18:32 — [Ablation (G_probe_mlp, 2048ep)] `G_probe_mlp_seed2` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=2, batch_size=32, tactile=True, conditions=physwm, detach_probe_input=False`
+- **Why this run:** Probe capacity ablation: checks the result is not an artifact of the linear probe (re-run at 2048ep).
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `G_probe_mlp_seed2.json`, `G_probe_mlp_seed2.log`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_stiffness | 0.7408 | 0.1771 |
+| drag | -0.1747 | -4.1608 |
+| mass | 0.1045 | -0.3801 |
+| object_radius | nan | nan |
+| poker_radius | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| contact_radius | nan | nan |
+| drag_over_mass | -0.0682 | -4.6672 |
+| stiffness_over_mass | 0.2924 | 0.0887 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_query_vs_dataset | 0.2779 |
+| path_a_vs_dataset | 0.3258 |
+| path_b_vs_dataset | 0.0696 |
+| path_b_vs_teacher | 0.2773 |
+| persistence_query_vs_dataset | 0.3552 |
+| persistence_vs_dataset | 0.5150 |
+
+### 2026-08-25 17:11 — [Functional use (2048ep)] `func2048_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=16, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=0, tactile=True, detach_probe_input=False, physics_target=path_a, theta_supervision=0.0`
+- **Why this run:** Functional use (substitution + multi-horizon rollout) at 2048 episodes, with theta_variation added to flag which PokeWorld parameters actually vary across episodes.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON; not run through overnight.py)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `func2048_seed0.json`, `func2048_seed0.log`
+
+**sensitivity** (prediction shift): mass 0.00498, contact_stiffness 0.01186, drag 0.00293, poker_radius 0.14747, object_radius 0.14693
+
+**theta variation across episodes:** mass (varies=True), contact_stiffness (varies=True), drag (varies=True), poker_radius (varies=False), object_radius (varies=False)
+
+**substitution** (one-step Path B error vs true s_next):
+
+| source | scaled RMSE |
+| --- | --- |
+| probe | 0.09047 |
+| true | 0.00000 |
+| shuffled | 0.08822 |
+| nominal | 0.10960 |
+
+probe closes **-2.6%** of the shuffled-to-true gap.
+
+**multi-horizon rollout** (scaled RMSE):
+
+| source | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| probe | 0.1312 | 0.1365 | 0.1952 | 0.2140 | 0.2109 | 0.2019 | 0.1990 |
+| true | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| shuffled | 0.1150 | 0.1199 | 0.1775 | 0.2227 | 0.2222 | 0.2161 | 0.2157 |
+| nominal | 0.1580 | 0.1878 | 0.2305 | 0.2556 | 0.2582 | 0.2586 | 0.2555 |
+
+### 2026-08-25 17:08 — [Functional use (2048ep)] `func2048_seed1` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=16, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=1, tactile=True, detach_probe_input=False, physics_target=path_a, theta_supervision=0.0`
+- **Why this run:** Functional use (substitution + multi-horizon rollout) at 2048 episodes, with theta_variation added to flag which PokeWorld parameters actually vary across episodes.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON; not run through overnight.py)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `func2048_seed1.json`, `func2048_seed1.log`
+
+**sensitivity** (prediction shift): mass 0.00355, contact_stiffness 0.01185, drag 0.02044, poker_radius 0.21455, object_radius 0.23225
+
+**theta variation across episodes:** mass (varies=True), contact_stiffness (varies=True), drag (varies=True), poker_radius (varies=False), object_radius (varies=False)
+
+**substitution** (one-step Path B error vs true s_next):
+
+| source | scaled RMSE |
+| --- | --- |
+| probe | 0.07919 |
+| true | 0.00000 |
+| shuffled | 0.09950 |
+| nominal | 0.09964 |
+
+probe closes **20.4%** of the shuffled-to-true gap.
+
+**multi-horizon rollout** (scaled RMSE):
+
+| source | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| probe | 0.1390 | 0.1142 | 0.1509 | 0.1542 | 0.1535 | 0.1774 | 0.1806 |
+| true | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| shuffled | 0.1343 | 0.1568 | 0.2042 | 0.2072 | 0.1980 | 0.2047 | 0.2035 |
+| nominal | 0.1705 | 0.1450 | 0.1548 | 0.1672 | 0.1690 | 0.1845 | 0.1834 |
+
+### 2026-08-25 17:10 — [Functional use (2048ep)] `func2048_seed2` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=16, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=2, tactile=True, detach_probe_input=False, physics_target=path_a, theta_supervision=0.0`
+- **Why this run:** Functional use (substitution + multi-horizon rollout) at 2048 episodes, with theta_variation added to flag which PokeWorld parameters actually vary across episodes.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON; not run through overnight.py)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `func2048_seed2.json`, `func2048_seed2.log`
+
+**sensitivity** (prediction shift): mass 0.02560, contact_stiffness 0.01237, drag 0.00374, poker_radius 0.17090, object_radius 0.18327
+
+**theta variation across episodes:** mass (varies=True), contact_stiffness (varies=True), drag (varies=True), poker_radius (varies=False), object_radius (varies=False)
+
+**substitution** (one-step Path B error vs true s_next):
+
+| source | scaled RMSE |
+| --- | --- |
+| probe | 0.09491 |
+| true | 0.00000 |
+| shuffled | 0.16564 |
+| nominal | 0.10059 |
+
+probe closes **42.7%** of the shuffled-to-true gap.
+
+**multi-horizon rollout** (scaled RMSE):
+
+| source | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| probe | 0.1211 | 0.1438 | 0.1656 | 0.1784 | 0.1964 | 0.1970 | 0.1995 |
+| true | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| shuffled | 0.1545 | 0.1530 | 0.1970 | 0.2405 | 0.2471 | 0.2409 | 0.2397 |
+| nominal | 0.1350 | 0.1287 | 0.1587 | 0.1875 | 0.1943 | 0.1981 | 0.2000 |
+
+### 2026-08-25 15:00 — [Pilot (2048ep, primary claim)] `A_pilot_2048ep_seed0` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=0, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Pilot run at the corrected 2048-episode budget, primary claim conditions.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `A_pilot_2048ep_seed0.json`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.7694 | 0.1180 | 0.7396 | -1.4193 | 0.8051 | 0.8002 |
+| drag | -0.1847 | -4.9174 | -0.2499 | -0.0126 | -0.4060 | -0.4371 |
+| mass | 0.2945 | -0.1336 | 0.2459 | -0.0689 | 0.1519 | 0.1488 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | 0.0386 | -2.1030 | 0.0515 | -0.0359 | -0.0100 | -0.0266 |
+| stiffness_over_mass | 0.4607 | 0.0509 | 0.4215 | -0.6106 | 0.4547 | 0.4679 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.3608 | 0.3328 | 0.3713 |
+| path_a_vs_dataset | 0.3850 | 0.3623 | 0.3865 |
+| path_b_vs_dataset | 0.0881 | 0.1172 | 0.0750 |
+| path_b_vs_teacher | 0.3570 | 0.3426 | 0.3721 |
+| persistence_query_vs_dataset | 0.4439 | 0.4439 | 0.4439 |
+| persistence_vs_dataset | 0.5509 | 0.5509 | 0.5509 |
+
+### 2026-08-25 18:21 — [Pilot (2048ep, primary claim)] `A_pilot_2048ep_seed1` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=1, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Pilot run at the corrected 2048-episode budget, primary claim conditions.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `A_pilot_2048ep_seed1.json`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.8182 | -0.0565 | 0.7498 | -1.3446 | 0.8416 | 0.8024 |
+| drag | -0.1549 | -9.0822 | -0.1718 | -0.0042 | -0.3360 | -0.3226 |
+| mass | 0.1860 | -0.4672 | 0.2110 | -0.0409 | 0.1466 | 0.1394 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | 0.0050 | -9.4305 | 0.0153 | -0.0615 | -0.1155 | -0.1009 |
+| stiffness_over_mass | 0.4719 | 0.1440 | 0.4204 | -0.6396 | 0.4466 | 0.4112 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.2853 | 0.2460 | 0.2984 |
+| path_a_vs_dataset | 0.3480 | 0.3255 | 0.3619 |
+| path_b_vs_dataset | 0.0842 | 0.1115 | 0.0732 |
+| path_b_vs_teacher | 0.2887 | 0.2582 | 0.2997 |
+| persistence_query_vs_dataset | 0.3505 | 0.3505 | 0.3505 |
+| persistence_vs_dataset | 0.5179 | 0.5179 | 0.5179 |
+
+### 2026-08-25 18:21 — [Pilot (2048ep, primary claim)] `A_pilot_2048ep_seed2` (2048ep re-run, logged post hoc)
+
+- **Params:** `encoder=tiny_cnn, window=8, probe_source=predicted, episodes=2048, length=48, epochs=60, alpha=1.0, seed=2, batch_size=32, tactile=True, conditions=predictive,physwm,theta_oracle, detach_probe_input=False`
+- **Why this run:** Pilot run at the corrected 2048-episode budget, primary claim conditions.
+- **Commit / working tree:** `13208111c`, dirty (logged after the fact from raw JSON in /workspace/physwm-artifacts/runs/; not run through overnight.py, so no exact command line or wall-clock is available)
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** unknown (no .log with timing for this run)
+- **Status:** pass (JSON payload present)
+- **Artifacts:** `A_pilot_2048ep_seed2.json`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_stiffness | 0.7647 | 0.1991 | 0.7731 | -1.3263 | 0.8038 | 0.8041 |
+| drag | -0.0991 | -5.2736 | -0.1500 | -0.0071 | -0.4538 | -0.4461 |
+| mass | 0.2295 | -0.4341 | 0.2656 | -0.1450 | 0.1996 | 0.1820 |
+| object_radius | nan | nan | nan | nan | nan | nan |
+| poker_radius | nan | nan | nan | nan | nan | nan |
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe | predictive/decodable | predictive/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| contact_radius | nan | nan | nan | nan | nan | nan |
+| drag_over_mass | 0.0628 | -6.6241 | 0.0607 | -0.0077 | -0.0935 | -0.0608 |
+| stiffness_over_mass | 0.4073 | 0.0880 | 0.4545 | -0.5723 | 0.4529 | 0.4231 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm | predictive | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_query_vs_dataset | 0.2684 | 0.2683 | 0.2959 |
+| path_a_vs_dataset | 0.3168 | 0.3155 | 0.3408 |
+| path_b_vs_dataset | 0.0766 | 0.0857 | 0.0629 |
+| path_b_vs_teacher | 0.2709 | 0.2782 | 0.2959 |
+| persistence_query_vs_dataset | 0.3552 | 0.3552 | 0.3552 |
+| persistence_vs_dataset | 0.5150 | 0.5150 | 0.5150 |
+
+### 2026-08-25 15:58 — [D. visual-only identifiability] `D_visual_only_seed2`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --window 8 --seed 2 --batch-size 32 --conditions predictive,physwm,theta_oracle --no-tactile --out /workspace/physwm-artifacts/runs/20260825-133600/D_visual_only_seed2.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/D_visual_only_seed2`
+- **Why this run:** Matches the visual-encoder claim and reports identifiable dynamics coordinates k/m and c/m, not misleading raw R2.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 136.7 min
+- **Status:** **FAIL**
+- **Artifacts:** `D_visual_only_seed2.log`
+
+```
+```
+
+- **Notes:** run failed; see the log for the traceback.
+
+### 2026-08-25 15:58 — [D. visual-only identifiability] `D_visual_only_seed1`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --window 8 --seed 1 --batch-size 32 --conditions predictive,physwm,theta_oracle --no-tactile --out /workspace/physwm-artifacts/runs/20260825-133600/D_visual_only_seed1.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/D_visual_only_seed1`
+- **Why this run:** Matches the visual-encoder claim and reports identifiable dynamics coordinates k/m and c/m, not misleading raw R2.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 136.7 min
+- **Status:** **FAIL**
+- **Artifacts:** `D_visual_only_seed1.log`
+
+```
+```
+
+- **Notes:** run failed; see the log for the traceback.
+
+### 2026-08-25 15:58 — [D. visual-only identifiability] `D_visual_only_seed0`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --window 8 --seed 0 --batch-size 32 --conditions predictive,physwm,theta_oracle --no-tactile --out /workspace/physwm-artifacts/runs/20260825-133600/D_visual_only_seed0.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/D_visual_only_seed0`
+- **Why this run:** Matches the visual-encoder claim and reports identifiable dynamics coordinates k/m and c/m, not misleading raw R2.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 136.7 min
+- **Status:** **FAIL**
+- **Artifacts:** `D_visual_only_seed0.log`
+
+```
+```
+
+- **Notes:** run failed; see the log for the traceback.
+
+### 2026-08-25 13:58 — [A. primary claim (predictive vs PhysWM vs theta ceiling)] `A_claim_tiny_seed1`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --window 8 --seed 1 --batch-size 32 --conditions predictive,physwm,theta_oracle --out /workspace/physwm-artifacts/runs/20260825-133600/A_claim_tiny_seed1.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/A_claim_tiny_seed1`
+- **Why this run:** Same checkpoint reports Path A accuracy, baseline blindness, PhysWM recovery, and the label-supervised ceiling.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 16.4 min
+- **Status:** pass
+- **Artifacts:** `A_claim_tiny_seed1.log`, `A_claim_tiny_seed1.json`, `models/A_claim_tiny_seed1/`
+
+**theta recovery — val R²**
+
+| param | predictive/decodable | predictive/own_probe | physwm/decodable | physwm/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| mass | -0.2299 | 0.0169 | -0.3554 | -0.2425 | -0.2452 | -0.2303 |
+| contact_stiffness | 0.6198 | -1.2041 | 0.0721 | -0.0213 | 0.3910 | 0.3407 |
+| drag | -0.5760 | -0.0024 | -0.6404 | -2.9162 | -0.4296 | -0.4757 |
+
+_(radii are constant by construction; their R² is `nan` and is omitted)_
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | predictive/decodable | predictive/own_probe | physwm/decodable | physwm/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| stiffness_over_mass | -0.0749 | -0.5802 | -0.3197 | 0.0645 | -0.0155 | 0.0910 |
+| drag_over_mass | -0.3586 | -0.0529 | -0.4835 | -2.7532 | -0.2867 | -0.1607 |
+
+**prediction and distillation — val RMSE**
+
+| metric | predictive | physwm | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_vs_dataset | 0.3938 | 0.3846 | 0.4332 |
+| path_a_query_vs_dataset | 0.3337 | 0.3435 | 0.3771 |
+| path_b_vs_teacher | 0.3256 | 0.3392 | 0.3758 |
+| path_b_vs_dataset | 0.0941 | 0.0725 | 0.0763 |
+| persistence_vs_dataset | 0.4701 | 0.4701 | 0.4701 |
+| persistence_query_vs_dataset | 0.3186 | 0.3186 | 0.3186 |
+
+### 2026-08-25 13:58 — [A. primary claim (predictive vs PhysWM vs theta ceiling)] `A_claim_tiny_seed0`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --window 8 --seed 0 --batch-size 32 --conditions predictive,physwm,theta_oracle --out /workspace/physwm-artifacts/runs/20260825-133600/A_claim_tiny_seed0.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/A_claim_tiny_seed0`
+- **Why this run:** Same checkpoint reports Path A accuracy, baseline blindness, PhysWM recovery, and the label-supervised ceiling.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 16.2 min
+- **Status:** pass
+- **Artifacts:** `A_claim_tiny_seed0.log`, `A_claim_tiny_seed0.json`, `models/A_claim_tiny_seed0/`
+
+**theta recovery — val R²**
+
+| param | predictive/decodable | predictive/own_probe | physwm/decodable | physwm/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| mass | -0.4364 | -0.0311 | -0.3991 | -0.2028 | -0.0985 | -0.1648 |
+| contact_stiffness | 0.3997 | -1.5344 | 0.1551 | -0.0718 | 0.5987 | 0.6058 |
+| drag | -0.5019 | -0.0347 | -0.8053 | -1.3016 | -0.3612 | -0.3633 |
+
+_(radii are constant by construction; their R² is `nan` and is omitted)_
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | predictive/decodable | predictive/own_probe | physwm/decodable | physwm/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| stiffness_over_mass | -0.0741 | -0.7003 | -0.3263 | 0.0237 | 0.1000 | 0.0962 |
+| drag_over_mass | -0.5487 | -0.0823 | -0.8160 | -1.4415 | -0.6029 | -0.4646 |
+
+**prediction and distillation — val RMSE**
+
+| metric | predictive | physwm | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_vs_dataset | 0.4984 | 0.5400 | 0.5423 |
+| path_a_query_vs_dataset | 0.4384 | 0.4683 | 0.4870 |
+| path_b_vs_teacher | 0.4648 | 0.4636 | 0.4953 |
+| path_b_vs_dataset | 0.1712 | 0.1334 | 0.0951 |
+| persistence_vs_dataset | 0.5850 | 0.5850 | 0.5850 |
+| persistence_query_vs_dataset | 0.4867 | 0.4867 | 0.4867 |
+
+### 2026-08-25 13:57 — [A. primary claim (predictive vs PhysWM vs theta ceiling)] `A_claim_tiny_seed2`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --window 8 --seed 2 --batch-size 32 --conditions predictive,physwm,theta_oracle --out /workspace/physwm-artifacts/runs/20260825-133600/A_claim_tiny_seed2.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/A_claim_tiny_seed2`
+- **Why this run:** Same checkpoint reports Path A accuracy, baseline blindness, PhysWM recovery, and the label-supervised ceiling.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 16.1 min
+- **Status:** pass
+- **Artifacts:** `A_claim_tiny_seed2.log`, `A_claim_tiny_seed2.json`, `models/A_claim_tiny_seed2/`
+
+**theta recovery — val R²**
+
+| param | predictive/decodable | predictive/own_probe | physwm/decodable | physwm/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| mass | -0.7390 | -0.1435 | -0.6215 | -0.1606 | -0.5268 | -0.4617 |
+| contact_stiffness | 0.3691 | -1.0804 | 0.4571 | 0.1861 | 0.3823 | 0.3590 |
+| drag | -1.1027 | -0.0516 | -0.7318 | -0.7455 | -0.4687 | -0.5407 |
+
+_(radii are constant by construction; their R² is `nan` and is omitted)_
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | predictive/decodable | predictive/own_probe | physwm/decodable | physwm/own_probe | theta_oracle/decodable | theta_oracle/own_probe |
+| --- | --- | --- | --- | --- | --- | --- |
+| stiffness_over_mass | -0.1947 | -0.5450 | -0.2006 | 0.1240 | -0.2585 | -0.1709 |
+| drag_over_mass | -0.9904 | -0.0019 | -0.9939 | -0.4261 | -0.3514 | -0.2683 |
+
+**prediction and distillation — val RMSE**
+
+| metric | predictive | physwm | theta_oracle |
+| --- | --- | --- | --- |
+| path_a_vs_dataset | 0.4135 | 0.4382 | 0.4555 |
+| path_a_query_vs_dataset | 0.3242 | 0.3572 | 0.3707 |
+| path_b_vs_teacher | 0.3305 | 0.3639 | 0.3824 |
+| path_b_vs_dataset | 0.1262 | 0.1201 | 0.0790 |
+| persistence_vs_dataset | 0.4657 | 0.4657 | 0.4657 |
+| persistence_query_vs_dataset | 0.2684 | 0.2684 | 0.2684 |
+
+### 2026-08-25 13:51 — [F. functional use (substitution and rollout)] `F_functional_seed1`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/functional_use.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --physics-target path_a --window 16 --seed 1 --batch-size 32 --theta-supervision 0.0 --horizon 7 --out /workspace/physwm-artifacts/runs/20260825-133600/F_functional_seed1.json`
+- **Why this run:** Distinguishes physically useful parameters from values that are merely correlated or decodable.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 10.0 min
+- **Status:** pass
+- **Artifacts:** `F_functional_seed1.log`, `F_functional_seed1.json`
+
+**sensitivity** (prediction shift, theta scaled 1.1x): mass 0.08277, contact_stiffness 0.01184, drag 0.00346, poker_radius 0.16578, object_radius 0.16043
+
+**substitution** (one-step Path B error vs true `s_next`):
+
+| source | scaled RMSE |
+| --- | --- |
+| true | 0.00000 |
+| nominal | 0.07084 |
+| shuffled | 0.10789 |
+| probe | 0.10916 |
+
+probe closes **-1.2%** of the shuffled-to-true gap.
+
+**multi-horizon rollout** (scaled RMSE):
+
+| source | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| true | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| probe | 0.1488 | 0.1182 | 0.1711 | 0.1699 | 0.1886 | 0.2039 | 0.2033 |
+| nominal | 0.0689 | 0.0642 | 0.1467 | 0.1299 | 0.1229 | 0.1314 | 0.1321 |
+| shuffled | 0.1176 | 0.1052 | 0.2084 | 0.2438 | 0.2444 | 0.2371 | 0.2340 |
+
+### 2026-08-25 13:51 — [G. context-length ablation] `G_context16_seed0`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --window 16 --seed 0 --batch-size 32 --conditions physwm --out /workspace/physwm-artifacts/runs/20260825-133600/G_context16_seed0.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/G_context16_seed0`
+- **Why this run:** Tests whether longer action-response history strengthens persistent parameter identification.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 9.9 min
+- **Status:** pass
+- **Artifacts:** `G_context16_seed0.log`, `G_context16_seed0.json`, `models/G_context16_seed0/`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| mass | -1.0743 | -0.1058 |
+| contact_stiffness | 0.2387 | 0.2166 |
+| drag | -1.4420 | -0.4995 |
+
+_(radii are constant by construction; their R² is `nan` and is omitted)_
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| stiffness_over_mass | -0.3492 | 0.2082 |
+| drag_over_mass | -1.5945 | -0.8595 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_vs_dataset | 0.5337 |
+| path_a_query_vs_dataset | 0.4679 |
+| path_b_vs_teacher | 0.4775 |
+| path_b_vs_dataset | 0.1221 |
+| persistence_vs_dataset | 0.5426 |
+| persistence_query_vs_dataset | 0.3777 |
+
+### 2026-08-25 13:51 — [F. functional use (substitution and rollout)] `F_functional_seed0`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/functional_use.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --physics-target path_a --window 16 --seed 0 --batch-size 32 --theta-supervision 0.0 --horizon 7 --out /workspace/physwm-artifacts/runs/20260825-133600/F_functional_seed0.json`
+- **Why this run:** Distinguishes physically useful parameters from values that are merely correlated or decodable.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 9.9 min
+- **Status:** pass
+- **Artifacts:** `F_functional_seed0.log`, `F_functional_seed0.json`
+
+**sensitivity** (prediction shift, theta scaled 1.1x): mass 0.05246, contact_stiffness 0.01187, drag 0.00259, poker_radius 0.13167, object_radius 0.13062
+
+**substitution** (one-step Path B error vs true `s_next`):
+
+| source | scaled RMSE |
+| --- | --- |
+| true | 0.00000 |
+| nominal | 0.11701 |
+| shuffled | 0.16364 |
+| probe | 0.14708 |
+
+probe closes **10.1%** of the shuffled-to-true gap.
+
+**multi-horizon rollout** (scaled RMSE):
+
+| source | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| true | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| probe | 0.1259 | 0.1388 | 0.1631 | 0.2697 | 0.2727 | 0.2654 | 0.2598 |
+| nominal | 0.1103 | 0.1615 | 0.1885 | 0.2650 | 0.2813 | 0.2808 | 0.2815 |
+| shuffled | 0.2086 | 0.2740 | 0.2634 | 0.3415 | 0.3347 | 0.3266 | 0.3233 |
+
+### 2026-08-25 13:51 — [F. functional use (substitution and rollout)] `F_functional_seed2`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/functional_use.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --physics-target path_a --window 16 --seed 2 --batch-size 32 --theta-supervision 0.0 --horizon 7 --out /workspace/physwm-artifacts/runs/20260825-133600/F_functional_seed2.json`
+- **Why this run:** Distinguishes physically useful parameters from values that are merely correlated or decodable.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 9.9 min
+- **Status:** pass
+- **Artifacts:** `F_functional_seed2.log`, `F_functional_seed2.json`
+
+**sensitivity** (prediction shift, theta scaled 1.1x): mass 0.05824, contact_stiffness 0.01234, drag 0.00327, poker_radius 0.26075, object_radius 0.25940
+
+**substitution** (one-step Path B error vs true `s_next`):
+
+| source | scaled RMSE |
+| --- | --- |
+| true | 0.00000 |
+| nominal | 0.11111 |
+| shuffled | 0.14816 |
+| probe | 0.11774 |
+
+probe closes **20.5%** of the shuffled-to-true gap.
+
+**multi-horizon rollout** (scaled RMSE):
+
+| source | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| true | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| probe | 0.1753 | 0.1356 | 0.1882 | 0.1851 | 0.1761 | 0.1944 | 0.2075 |
+| nominal | 0.1872 | 0.1426 | 0.2021 | 0.2210 | 0.2133 | 0.2099 | 0.2221 |
+| shuffled | 0.2454 | 0.2068 | 0.3074 | 0.2980 | 0.3040 | 0.2935 | 0.2920 |
+
+### 2026-08-25 13:51 — [C. target ablation (dataset next-state target)] `C_dataset_target_seed0`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --window 8 --seed 0 --batch-size 32 --conditions state_target --out /workspace/physwm-artifacts/runs/20260825-133600/C_dataset_target_seed0.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/C_dataset_target_seed0`
+- **Why this run:** Replaces the model prediction with the raw state label while keeping the solver and route fixed.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 9.3 min
+- **Status:** pass
+- **Artifacts:** `C_dataset_target_seed0.log`, `C_dataset_target_seed0.json`, `models/C_dataset_target_seed0/`
+
+**theta recovery — val R²**
+
+| param | state_target/decodable | state_target/own_probe |
+| --- | --- | --- |
+| mass | -0.0588 | 0.0427 |
+| contact_stiffness | 0.5595 | 0.5278 |
+| drag | -0.8515 | -0.1031 |
+
+_(radii are constant by construction; their R² is `nan` and is omitted)_
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | state_target/decodable | state_target/own_probe |
+| --- | --- | --- |
+| stiffness_over_mass | 0.2107 | 0.1781 |
+| drag_over_mass | -0.4518 | -0.0624 |
+
+**prediction and distillation — val RMSE**
+
+| metric | state_target |
+| --- | --- |
+| path_a_vs_dataset | 0.4900 |
+| path_a_query_vs_dataset | 0.4433 |
+| path_b_vs_teacher | 0.4453 |
+| path_b_vs_dataset | 0.0994 |
+| persistence_vs_dataset | 0.5850 |
+| persistence_query_vs_dataset | 0.4867 |
+
+### 2026-08-25 13:51 — [B. routing ablation (pre-action encoder latent)] `B_preaction_seed0`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source encoded --window 8 --seed 0 --batch-size 32 --conditions physwm --out /workspace/physwm-artifacts/runs/20260825-133600/B_preaction_seed0.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/B_preaction_seed0`
+- **Why this run:** Tests whether reading the SAME action-conditioned latent is necessary; this is the route used by the earlier code.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 9.3 min
+- **Status:** pass
+- **Artifacts:** `B_preaction_seed0.log`, `B_preaction_seed0.json`, `models/B_preaction_seed0/`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| mass | -0.1283 | -0.5990 |
+| contact_stiffness | 0.1182 | -0.7348 |
+| drag | 0.0080 | -0.1713 |
+
+_(radii are constant by construction; their R² is `nan` and is omitted)_
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| stiffness_over_mass | 0.0717 | 0.0232 |
+| drag_over_mass | -0.0618 | -0.3455 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_vs_dataset | 0.5351 |
+| path_a_query_vs_dataset | 0.4654 |
+| path_b_vs_teacher | 0.4603 |
+| path_b_vs_dataset | 0.0971 |
+| persistence_vs_dataset | 0.5850 |
+| persistence_query_vs_dataset | 0.4867 |
+
+### 2026-08-25 13:51 — [B. routing ablation (pre-action encoder latent)] `B_preaction_seed2`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source encoded --window 8 --seed 2 --batch-size 32 --conditions physwm --out /workspace/physwm-artifacts/runs/20260825-133600/B_preaction_seed2.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/B_preaction_seed2`
+- **Why this run:** Tests whether reading the SAME action-conditioned latent is necessary; this is the route used by the earlier code.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 9.2 min
+- **Status:** pass
+- **Artifacts:** `B_preaction_seed2.log`, `B_preaction_seed2.json`, `models/B_preaction_seed2/`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| mass | -0.2801 | -0.8757 |
+| contact_stiffness | -0.3187 | -1.0197 |
+| drag | -0.0582 | -0.2065 |
+
+_(radii are constant by construction; their R² is `nan` and is omitted)_
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| stiffness_over_mass | -0.3531 | -0.2219 |
+| drag_over_mass | -0.1773 | -0.4306 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_vs_dataset | 0.4389 |
+| path_a_query_vs_dataset | 0.3561 |
+| path_b_vs_teacher | 0.3535 |
+| path_b_vs_dataset | 0.0813 |
+| persistence_vs_dataset | 0.4657 |
+| persistence_query_vs_dataset | 0.2684 |
+
+### 2026-08-25 13:51 — [G. probe capacity ablation] `G_probe_mlp_seed0`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 128 --alpha 1.0 --probe-source predicted --window 8 --seed 0 --batch-size 32 --conditions physwm --out /workspace/physwm-artifacts/runs/20260825-133600/G_probe_mlp_seed0.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/G_probe_mlp_seed0`
+- **Why this run:** Checks that the result is not an artifact of the linear probe.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 9.2 min
+- **Status:** pass
+- **Artifacts:** `G_probe_mlp_seed0.log`, `G_probe_mlp_seed0.json`, `models/G_probe_mlp_seed0/`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| mass | -0.5892 | -0.2138 |
+| contact_stiffness | 0.4806 | 0.0601 |
+| drag | -0.8259 | -2.4611 |
+
+_(radii are constant by construction; their R² is `nan` and is omitted)_
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| stiffness_over_mass | -0.2697 | 0.1624 |
+| drag_over_mass | -0.6708 | -2.0594 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_vs_dataset | 0.5162 |
+| path_a_query_vs_dataset | 0.4551 |
+| path_b_vs_teacher | 0.4519 |
+| path_b_vs_dataset | 0.1298 |
+| persistence_vs_dataset | 0.5850 |
+| persistence_query_vs_dataset | 0.4867 |
+
+### 2026-08-25 13:51 — [B. routing ablation (pre-action encoder latent)] `B_preaction_seed1`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source encoded --window 8 --seed 1 --batch-size 32 --conditions physwm --out /workspace/physwm-artifacts/runs/20260825-133600/B_preaction_seed1.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/B_preaction_seed1`
+- **Why this run:** Tests whether reading the SAME action-conditioned latent is necessary; this is the route used by the earlier code.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 9.2 min
+- **Status:** pass
+- **Artifacts:** `B_preaction_seed1.log`, `B_preaction_seed1.json`, `models/B_preaction_seed1/`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| mass | -0.1582 | -0.3183 |
+| contact_stiffness | -0.3630 | -0.5285 |
+| drag | -0.3137 | -1.1576 |
+
+_(radii are constant by construction; their R² is `nan` and is omitted)_
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| stiffness_over_mass | -0.2283 | -0.0908 |
+| drag_over_mass | -0.1587 | -2.2553 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_vs_dataset | 0.3826 |
+| path_a_query_vs_dataset | 0.3432 |
+| path_b_vs_teacher | 0.3390 |
+| path_b_vs_dataset | 0.0654 |
+| persistence_vs_dataset | 0.4701 |
+| persistence_query_vs_dataset | 0.3186 |
+
+### 2026-08-25 13:51 — [C. induction ablation (detached probe input)] `C_posthoc_seed0`
+
+- **Command:** `/workspace/stable-worldmodel/.venv/bin/python -u /workspace/stable-worldmodel/scripts/eval/decodability.py --encoder tiny_cnn --epochs 60 --episodes 512 --length 48 --probe-hidden 0 --alpha 1.0 --probe-source predicted --window 8 --seed 0 --batch-size 32 --conditions physwm --detach-probe-input --out /workspace/physwm-artifacts/runs/20260825-133600/C_posthoc_seed0.json --save-dir /workspace/physwm-artifacts/runs/20260825-133600/models/C_posthoc_seed0`
+- **Why this run:** Tests representation induction against fitting only a post-hoc probe on a latent the physics loss cannot shape.
+- **Commit / working tree:** `13208111c`, clean
+- **Hardware:** NVIDIA H100 80GB HBM3, python
+- **Duration:** 9.2 min
+- **Status:** pass
+- **Artifacts:** `C_posthoc_seed0.log`, `C_posthoc_seed0.json`, `models/C_posthoc_seed0/`
+
+**theta recovery — val R²**
+
+| param | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| mass | -0.3369 | -0.0898 |
+| contact_stiffness | 0.4107 | -0.1082 |
+| drag | -0.7766 | -2.1337 |
+
+_(radii are constant by construction; their R² is `nan` and is omitted)_
+
+**identifiable dynamics coordinates — val R²**
+
+| coordinate | physwm/decodable | physwm/own_probe |
+| --- | --- | --- |
+| stiffness_over_mass | 0.0559 | 0.1669 |
+| drag_over_mass | -0.6071 | -1.1814 |
+
+**prediction and distillation — val RMSE**
+
+| metric | physwm |
+| --- | --- |
+| path_a_vs_dataset | 0.4991 |
+| path_a_query_vs_dataset | 0.4475 |
+| path_b_vs_teacher | 0.4433 |
+| path_b_vs_dataset | 0.0985 |
+| persistence_vs_dataset | 0.5850 |
+| persistence_query_vs_dataset | 0.4867 |
+
 ### 2026-08-25 18:35 IST — Aligned workshop protocol: matrix and focused checks
 
 - **Commands:**

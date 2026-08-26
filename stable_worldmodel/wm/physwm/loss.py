@@ -34,6 +34,7 @@ def physwm_loss(
     beta: float = 0.0,
     consistency_detach: str = 'none',
     physics_target: str = 'path_a',
+    vq_beta: float = 1.0,
 ) -> dict:
     """Compute the composite objective and its diagnostics.
 
@@ -90,13 +91,19 @@ def physwm_loss(
     b_c = b_phys.detach() if consistency_detach == 'b' else b_phys
     loss_consistency = (a_c - b_c).pow(2).mean()
 
+    vq_loss = out.get('vq_loss')
     loss = loss_a + alpha * loss_b + beta * loss_consistency
+    if vq_loss is not None:
+        loss = loss + vq_beta * vq_loss
 
     return {
         'loss': loss,
         'loss_a': loss_a,
         'loss_b': loss_b,
         'loss_consistency': loss_consistency,
+        'loss_vq': (
+            vq_loss.detach() if vq_loss is not None else torch.tensor(0.0)
+        ),
     }
 
 

@@ -441,6 +441,29 @@ def main():
     ap.add_argument('--threads', type=int, default=2,
                     help='intra-op threads per experiment process')
     ap.add_argument('--seeds', default='0,1,2')
+    ap.add_argument(
+        '--light-episodes', type=int, default=None,
+        help='override the episode budget for tiny_cnn runs. The matrix '
+             'defaults (512) yield only ~1300 touch-filtered training '
+             'windows, which is below the threshold where theta is '
+             'recoverable at all -- even the theta_oracle ceiling comes '
+             'out negative there. 2048 gives ~5450 windows and the '
+             'ceiling recovers.',
+    )
+    ap.add_argument(
+        '--heavy-episodes', type=int, default=None,
+        help='override the episode budget for DINOv2 runs (matrix: 128).',
+    )
+    ap.add_argument(
+        '--length', type=int, default=None,
+        help='override episode length. Raise it to chase `drag`, which is '
+             'not identifiable at the default 48 steps (~0.96 s): there is '
+             'too little free-glide decay to see it.',
+    )
+    ap.add_argument(
+        '--light-only', action='store_true',
+        help='run the tiny_cnn pool and skip the DINOv2 pool.',
+    )
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--smoke', action='store_true',
                     help='2 tiny experiments, to check the harness itself')
@@ -457,14 +480,31 @@ def main():
         ]
     else:
         exps = build_matrix(seeds)
+    def _override(exp, flag, value):
+        """Replace one flag's value in an experiment's argv."""
+        argv = exp['args']
+        i = argv.index(flag)
+        argv[i + 1] = str(value)
+
+    for e in exps:
+        episodes = args.heavy_episodes if e['heavy'] else args.light_episodes
+        if episodes is not None:
+            _override(e, '--episodes', episodes)
+        if args.length is not None:
+            _override(e, '--length', args.length)
+
     results_dir = Path(
         args.results_dir
         or ROOT / 'outputs' / 'overnight'
         / datetime.now(timezone.utc).astimezone().strftime('%Y%m%d_%H%M')
     )
 
-    heavy = [e for e in exps if e['heavy']]
+    heavy = [] if args.light_only else [e for e in exps if e['heavy']]
     light = [e for e in exps if not e['heavy']]
+    if args.light_only:
+        skipped = len([e for e in exps if e['heavy']])
+        print(f'--light-only: skipping {skipped} DINOv2 experiments')
+        exps = light
     print(f'{len(exps)} experiments '
           f'({len(light)} light, {len(heavy)} heavy) -> {results_dir}')
     for e in exps:

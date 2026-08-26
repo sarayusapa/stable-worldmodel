@@ -52,7 +52,8 @@ def scaled_rmse(pred, target, scale, mask=None):
 def collect(model, loader, device):
     """Everything the interventions need, on held-out windows."""
     model.eval()
-    S, A, SN, TH_P, TH_T, EP = [], [], [], [], [], []
+    S, A, SN, TH_P, TH_T, EP, G = [], [], [], [], [], [], []
+    has_goal = None
     for batch in loader:
         batch = {
             k: v.to(device) if torch.is_tensor(v) else v
@@ -60,6 +61,8 @@ def collect(model, loader, device):
         }
         if 'theta_true' not in batch:
             raise SystemExit('benchmark has no ground-truth theta')
+        if has_goal is None:
+            has_goal = 'goal' in batch
         out = model(batch)
         th = out['theta']
         if th.dim() == 3:
@@ -78,17 +81,22 @@ def collect(model, loader, device):
         TH_P.append(th)
         TH_T.append(batch['theta_true'])
         EP.append(batch['episode'])
+        if has_goal:
+            G.append(batch['goal'])
     s, a, sn = torch.cat(S), torch.cat(A), torch.cat(SN)
     th_p, th_t, episode = torch.cat(TH_P), torch.cat(TH_T), torch.cat(EP)
+    g = torch.cat(G) if has_goal else None
     rows = []
     for ep in episode.unique(sorted=True):
         keep = (episode == ep).nonzero(as_tuple=False).flatten()
         first = keep[0]
-        rows.append((
-            s[first], a[first], sn[first],
-            th_p[keep].mean(0), th_t[first],
-        ))
-    return tuple(torch.stack([row[i] for row in rows]) for i in range(5))
+        row = [s[first], a[first], sn[first], th_p[keep].mean(0), th_t[first]]
+        if has_goal:
+            row.append(g[first])
+        rows.append(tuple(row))
+    n = len(rows[0])
+    out = tuple(torch.stack([row[i] for row in rows]) for i in range(n))
+    return out if has_goal else out + (None,)
 
 
 def sensitivity(solver, s, a, theta, names, eps=0.1, mask=None):
@@ -102,6 +110,25 @@ def sensitivity(solver, s, a, theta, names, eps=0.1, mask=None):
         pred = solver(s, a, bumped.unsqueeze(1).expand(-1, s.shape[1], -1))
         out[n] = scaled_rmse(pred, base, scale, mask)
     return out
+
+
+def theta_variation(theta_true, names, rel_tol=1e-6):
+    """Per-parameter spread across episodes.
+
+    PokeWorld fixes the two radii by construction, so they are identical
+    in every episode. Shuffling theta between episodes cannot perturb
+    them, and the substitution gap is therefore generated entirely by the
+    parameters that do vary. Reporting sensitivity without that context
+    reads as if the method were chasing inert parameters, so mark them.
+    """
+    std = theta_true.float().std(0)
+    mean = theta_true.float().mean(0).abs()
+    rel = std / mean.clamp_min(1e-12)
+    return {
+        n: {'std': float(std[i]), 'mean': float(theta_true[:, i].float().mean()),
+            'varies': bool(rel[i] > rel_tol)}
+        for i, n in enumerate(names)
+    }
 
 
 def substitution(
@@ -133,6 +160,42 @@ def rollout(solver, s0, a, theta, horizon):
         preds.append(s)
         s = s.unsqueeze(1)
     return torch.stack(preds, 1)
+
+
+def success_rate(solver, s0, a, theta, goal, obj_idx, threshold, horizon):
+    """Fraction of episodes whose object position ever comes within
+    ``threshold`` of ``goal`` during an H-step FROZEN-SOLVER rollout under
+    ``theta``. This is the solver-space analog of the real env's
+    ``is_success`` -- a substituted theta can only be evaluated inside the
+    differentiable solver, not the real MuJoCo sim, so "success" here
+    means "the physics this theta implies would have reached the goal",
+    not "the real robot reached it".
+    """
+    horizon = min(horizon, a.shape[1])  # same guard as multi_horizon()
+    preds = rollout(solver, s0, a, theta, horizon)  # (B, horizon, state_dim)
+    obj_traj = preds[..., obj_idx]  # (B, horizon, len(obj_idx))
+    dist = (obj_traj - goal.unsqueeze(1)).norm(dim=-1)  # (B, horizon)
+    reached = dist.min(dim=1).values < threshold
+    return float(reached.float().mean())
+
+
+def task_success(solver, s0, a, theta_probe, theta_true, goal, obj_idx, threshold, horizon):
+    """Same true/probe/shuffled/nominal comparison as ``substitution()``,
+    scored as success rate instead of prediction error -- turns "is theta
+    functionally used" into "does using it reach the goal".
+    """
+    perm = torch.randperm(len(theta_true), device=theta_true.device)
+    nominal = solver.theta_nominal.to(theta_true.device)
+    sources = {
+        'probe': theta_probe,
+        'true': theta_true,
+        'shuffled': theta_true[perm],
+        'nominal': nominal.unsqueeze(0).expand(len(theta_true), -1),
+    }
+    return {
+        k: success_rate(solver, s0, a, th, goal, obj_idx, threshold, horizon)
+        for k, th in sources.items()
+    }
 
 
 def multi_horizon(
@@ -184,6 +247,16 @@ def main():
     ap.add_argument('--theta-supervision', type=float, default=0.0)
     ap.add_argument('--no-amp', action='store_true')
     ap.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu')
+    ap.add_argument(
+        '--benchmark', default='pokeworld',
+        choices=['pokeworld', 'pusht_rand', 'fetch_push'],
+    )
+    ap.add_argument(
+        '--goal-threshold', type=float, default=0.05,
+        help='distance (real units) within which the object counts as '
+             'having reached the goal in a solver rollout -- 0.05 matches '
+             "Gymnasium-Robotics Fetch's own is_success threshold.",
+    )
     ap.add_argument('--out', default=None)
     args = ap.parse_args()
 
@@ -199,6 +272,7 @@ def main():
         detach_probe_input=args.detach_probe_input,
         window=args.window,
         tactile=not args.no_tactile,
+        benchmark=args.benchmark,
     )
     model, tl, vl = train(
         cfg,
@@ -214,11 +288,28 @@ def main():
     solver = model.solver
     names = list(solver.theta_names)
 
-    s, a, s_next, th_p, th_t = collect(model, vl, device)
+    s, a, s_next, th_p, th_t, goal = collect(model, vl, device)
     scale = s.reshape(-1, s.shape[-1]).std(0).clamp_min(1e-6)
     mask = model.state_loss_mask
 
+    # task-success layer: only meaningful where a goal exists AND the
+    # solver's state includes an explicit object position (Fetch), not
+    # PokeWorld/pusht_rand -- skip cleanly rather than guessing indices
+    success = None
+    if goal is not None and hasattr(solver, 'state_names') and (
+        'object_x' in solver.state_names and 'object_y' in solver.state_names
+    ):
+        obj_idx = [
+            solver.state_names.index('object_x'),
+            solver.state_names.index('object_y'),
+        ]
+        success = task_success(
+            solver, s[:, :1], a, th_p, th_t, goal, obj_idx,
+            args.goal_threshold, args.horizon,
+        )
+
     sens = sensitivity(solver, s, a, th_p, names, eps=args.eps, mask=mask)
+    variation = theta_variation(th_t, names)
     sub = substitution(
         solver, s, a, s_next, th_p, th_t, scale, mask=mask
     )
@@ -235,7 +326,13 @@ def main():
     print('   (near zero => the solver ignores that component; recovering '
           'it is meaningless)')
     for n in names:
-        print(f'   {n:<{w}} {sens[n]:>10.5f}')
+        tag = '' if variation[n]['varies'] else '   [constant by construction]'
+        print(f'   {n:<{w}} {sens[n]:>10.5f}{tag}')
+    live = [n for n in names if variation[n]['varies']]
+    if len(live) < len(names):
+        print(f'\n   only {len(live)} of {len(names)} parameters vary across '
+              'episodes; the substitution\n   gap below is generated by '
+              f'{", ".join(live)} alone.')
 
     print('\n2. SUBSTITUTION: one-step Path B error vs true s_next '
           '(scaled RMSE, lower better)')
@@ -259,6 +356,19 @@ def main():
           'as the\n   horizon grows is the evidence that theta is '
           'functionally used.')
 
+    if success is not None:
+        print(f'\n4. TASK SUCCESS: fraction of episodes reaching the goal '
+              f'in a {args.horizon}-step solver rollout (threshold '
+              f'{args.goal_threshold})')
+        for k in ('true', 'probe', 'nominal', 'shuffled'):
+            print(f'   {k:<{w}} {success[k]:>10.1%}')
+        print('\n   this scores the SAME true/probe/shuffled/nominal '
+              'comparison as (2)/(3) by task outcome\n   instead of '
+              'prediction error -- a probe rate near `true` and clearly '
+              'above `shuffled`\n   means the recovered physics is worth '
+              'something for the actual task, not just accurate\n   in an '
+              'RMSE sense.')
+
     if args.out:
         Path(args.out).write_text(json.dumps(
             {'meta': {'encoder': args.encoder,
@@ -275,8 +385,10 @@ def main():
                       'length': args.length, 'alpha': args.alpha,
                       'seed': args.seed,
                       'theta_supervision': args.theta_supervision},
-             'sensitivity': sens, 'substitution': sub,
-             'multi_horizon': curves}, indent=2))
+             'sensitivity': sens, 'theta_variation': variation,
+             'substitution': sub,
+             'multi_horizon': curves,
+             'task_success': success}, indent=2))
         print(f'\nwrote {args.out}')
 
 

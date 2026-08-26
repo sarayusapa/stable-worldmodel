@@ -25,6 +25,8 @@ from stable_worldmodel.wm.lewm.module import FeedForward
 # ----------------------------------------------------------------------
 
 
+from .vq import VectorQuantizer
+
 class TinyCNNEncoder(nn.Module):
     """Small conv encoder producing a patch-token grid.
 
@@ -334,6 +336,9 @@ class ThetaProbe(nn.Module):
         detach_input: bool = False,
         init_scale: float = 0.01,
         tactile_tokens: int = 0,
+        quantize: bool = False,
+        num_codes: int = 64,
+        commitment_beta: float = 0.25,
     ):
         super().__init__()
         assert mode in ('episode', 'step'), f'bad probe mode {mode!r}'
@@ -369,14 +374,46 @@ class ThetaProbe(nn.Module):
         nn.init.normal_(head.weight, std=init_scale)
         nn.init.zeros_(head.bias)
 
+        self.quantizer = (
+            VectorQuantizer(
+                theta_dim, num_codes=num_codes, commitment_beta=commitment_beta
+            )
+            if quantize
+            else None
+        )
+        self.last_vq_loss = None
+        self.last_vq_indices = None
+
     @property
     def num_params(self) -> int:
         return sum(p.numel() for p in self.parameters())
 
     def init_from_solver(self, solver) -> None:
-        """Bias-init so the initial theta equals the solver's nominal set."""
+        """Bias-init so the initial theta equals the solver's nominal set.
+
+        For the quantized variant, seed EVERY code near the solver's
+        nominal raw-theta scale (not just index 0): ``VectorQuantizer``'s
+        own default init is a tiny ``uniform(-1/K, 1/K)``, which has no
+        way to know the actual scale ``theta_raw`` operates at. Left
+        uncorrected, the encoder's output (unconstrained until
+        ``bound_theta``) drifts far outside that tiny range early in
+        training, distances to every code but the nearest explode
+        together, and the codebook collapses to a single code chasing a
+        moving target (confirmed empirically: default init collapsed to
+        1/8 active codes with ``loss_vq`` growing, not shrinking, over
+        training). Seeding every code in the same neighborhood as
+        ``nominal_raw()`` gives the argmin genuine choices from step one.
+        """
         with torch.no_grad():
             self.net[-1].bias.copy_(solver.nominal_raw())
+            if self.quantizer is not None:
+                nominal = solver.nominal_raw()
+                noise = 0.1 * torch.randn_like(
+                    self.quantizer.codebook.weight
+                )
+                self.quantizer.codebook.weight.copy_(
+                    nominal.unsqueeze(0) + noise
+                )
 
     def features(self, z):
         """Return the exact low-capacity feature consumed by the probe.
@@ -410,8 +447,21 @@ class ThetaProbe(nn.Module):
 
         Any tactile tokens are the LAST ``tactile_tokens`` entries along the
         token axis (see ``PhysWM.encode``); they bypass pooling.
+
+        If quantization is enabled, the returned tensor is the STRAIGHT-
+        THROUGH quantized theta (gradients pass through unchanged to the
+        pre-quantization value); the commitment+codebook loss is cached on
+        ``self.last_vq_loss`` for the caller to add into the total
+        objective (see ``PhysWM.forward`` / ``physwm_loss``).
         """
-        return self.net(self.features(z))
+        raw = self.net(self.features(z))
+        if self.quantizer is not None:
+            raw, vq_loss, indices = self.quantizer(raw)
+            self.last_vq_loss = vq_loss
+            self.last_vq_indices = indices
+        else:
+            self.last_vq_loss = None
+        return raw
 
 
 __all__ = [

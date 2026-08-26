@@ -19,6 +19,7 @@ training loop never has to care which one it is looking at:
 """
 
 import os
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -263,6 +264,251 @@ def _resize(frame, size):
     return cv2.resize(frame, (size, size), interpolation=cv2.INTER_AREA)
 
 
+def pusht_randomized_episodes(
+    num_episodes: int,
+    length: int,
+    seed: int = 0,
+    frameskip: int = 1,
+    image_size: int = 64,
+    render: bool = True,
+    kp_range=(40.0, 200.0),
+    kv_range=(8.0, 40.0),
+    friction_range=(0.2, 2.0),
+    mass_range=(0.4, 3.0),
+):
+    """PushT with per-episode physics, giving it a ground-truth theta.
+
+    Stock PushT fixes its dynamics, so every episode shares one theta and
+    the shuffled-theta control is vacuous: permuting a constant changes
+    nothing. Randomizing per episode makes identifiability measurable.
+
+    ``k_p`` and ``k_v`` are recorded as ground truth because
+    :class:`PushTSolver` reproduces the environment's PD agent law
+    exactly, so their true values are known. Block friction and mass are
+    also randomized -- they change the dynamics, which is what makes the
+    shuffled control informative -- but they enter the solver only
+    through effective quasi-static mobilities with no 1:1 counterpart, so
+    no ground truth is claimed for them and those theta entries are left
+    at their nominal constants (the R^2 helper drops constant columns).
+    """
+    import gymnasium as gym
+
+    import stable_worldmodel  # noqa: F401  (registers the swm/* ids)
+
+    os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+    rng = np.random.default_rng(seed)
+    env = gym.make('swm/PushT-v1', resolution=image_size)
+    policy = pusht_contact_policy(seed=seed)
+    episodes = []
+
+    for ep_i in range(num_episodes):
+        obs, _ = env.reset(seed=int(seed + ep_i))
+        u = env.unwrapped
+        kp = float(rng.uniform(*kp_range))
+        kv = float(rng.uniform(*kv_range))
+        friction = float(rng.uniform(*friction_range))
+        mass = float(rng.uniform(*mass_range))
+        u.k_p, u.k_v = kp, kv
+        for body in getattr(u.space, 'bodies', []):
+            if body is getattr(u, 'agent', None):
+                continue
+            try:
+                body.mass = mass
+            except (AttributeError, AssertionError):
+                pass
+        for shape in getattr(u.space, 'shapes', []):
+            try:
+                shape.friction = friction
+            except AttributeError:
+                pass
+
+        states, actions, frames = [], [], []
+        for _ in range(length):
+            st = np.asarray(obs['state'], dtype=np.float32)
+            a = np.asarray(policy(st), dtype=np.float32).reshape(-1)
+            states.append(st)
+            actions.append(a)
+            if render:
+                frame = _resize(np.asarray(env.render()), image_size)
+                frames.append(np.asarray(frame, dtype=np.float32) / 255.0)
+            for _ in range(frameskip):
+                obs, _, term, trunc, _ = env.step(a)
+                if term or trunc:
+                    obs, _ = env.reset(seed=int(seed + ep_i))
+                    break
+        state_arr = np.stack(states)
+        # PushT reports `block.angle % 2*pi`; unwrap so the angle channel
+        # is the continuous one the solver integrates
+        state_arr[:, 4] = np.unwrap(state_arr[:, 4])
+        ep = {
+            'state': state_arr.astype(np.float32),
+            'action': np.stack(actions),
+            # order matches PushTSolver.theta_names; only kp/kv vary
+            'theta_true': np.array(
+                [kp, kv, 15.0, 30.0, 400.0, 1.0, 1.0, 0.0, 0.0],
+                dtype=np.float32,
+            ),
+            'physics': {'k_p': kp, 'k_v': kv,
+                        'friction': friction, 'mass': mass},
+        }
+        if render and frames:
+            ep['pixels'] = np.stack(frames).transpose(0, 3, 1, 2)
+        episodes.append(ep)
+    env.close()
+
+    _FETCH_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    tmp_path = cache_path.with_suffix('.tmp')
+    with open(tmp_path, 'wb') as f:
+        pickle.dump(episodes, f)
+    tmp_path.replace(cache_path)  # atomic: no other process sees a partial file
+
+    return episodes, None
+
+
+def fetch_expert_policy(noise: float = 0.15, seed: int = 0):
+    """Scripted Fetch-push policy that actually drives contact.
+
+    Mirrors :func:`pusht_contact_policy`'s minimalism: uniform-random
+    actions almost never bring the gripper into contact with the object,
+    so the object stays still and the mass/friction physics are never
+    exercised. This steers the gripper at the object (planar, gripper
+    held closed throughout -- Push/Slide never need it open) with
+    exploration noise on top.
+
+    Uses Fetch's standard 25-d ``observation`` layout: ``grip_pos =
+    obs[0:3]``, ``object_pos = obs[3:6]`` (stable across
+    gymnasium-robotics Push/Slide/PickAndPlace).
+    """
+    rng = np.random.default_rng(seed)
+
+    def policy(obs):
+        grip = obs[0:3]
+        obj = obs[3:6]
+        a_xyz = (obj - grip) * 5.0
+        a_xyz = a_xyz + rng.normal(0, noise, size=3)
+        a_xyz[2] = 0.0  # stay planar: push/slide keep the gripper height fixed
+        a = np.concatenate([a_xyz, [-1.0]])  # gripper held closed
+        return np.clip(a, -1.0, 1.0).astype(np.float32)
+
+    return policy
+
+
+_FETCH_CACHE_DIR = Path(
+    os.environ.get('SWM_FETCH_CACHE_DIR', '/workspace/physwm-artifacts/fetch_episode_cache')
+)
+
+
+def _fetch_cache_key(num_episodes, length, seed, frameskip, image_size, render, env_id):
+    return (
+        f'{env_id.replace("/", "_")}_ep{num_episodes}_len{length}_seed{seed}'
+        f'_fs{frameskip}_img{image_size}_render{int(render)}.pkl'
+    )
+
+
+def fetch_episodes(
+    num_episodes: int,
+    length: int,
+    seed: int = 0,
+    frameskip: int = 1,
+    image_size: int = 64,
+    render: bool = True,
+    env_id: str = 'swm/FetchPush-v3',
+):
+    """Fetch Push/Slide episodes with per-episode ground-truth (mass, friction).
+
+    Ground truth comes from :class:`FetchWrapper`'s own
+    ``info['theta_true']`` (realized MuJoCo ``body_mass`` /
+    ``geom_friction`` after each reset, not just the sampled target) --
+    unlike :func:`pusht_randomized_episodes`, which has to reach into
+    pymunk bodies/shapes directly because PushT has no such plumbing.
+
+    State is the reduced 6-d planar projection
+    :class:`~stable_worldmodel.wm.physwm.solvers.FetchPushSolver` expects:
+    ``[gripper_x, gripper_y, object_x, object_y, object_vx, object_vy]``,
+    read out of Fetch's standard 25-d ``observation`` layout.
+
+    Collection is CPU-bound (MuJoCo rollout + software EGL rendering when
+    no GPU render device is available -- common on shared pods) and can
+    take much longer than the actual training that follows. Results are
+    cached to disk keyed by every parameter that affects the data, so
+    re-running with the same (seed, num_episodes, length, ...) -- as
+    happens whenever several conditions share a seed/episode budget --
+    pays the collection cost once, not once per condition.
+    """
+    import gymnasium as gym
+    import pickle
+
+    import stable_worldmodel  # noqa: F401  (registers the swm/* ids)
+
+    cache_key = _fetch_cache_key(
+        num_episodes, length, seed, frameskip, image_size, render, env_id
+    )
+    cache_path = _FETCH_CACHE_DIR / cache_key
+    if cache_path.exists():
+        with open(cache_path, 'rb') as f:
+            return pickle.load(f), None
+
+    os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+    render_mode = 'rgb_array' if render else None
+    env = gym.make(env_id, render_mode=render_mode, resolution=image_size)
+    policy = fetch_expert_policy(seed=seed)
+    episodes = []
+
+    for ep_i in range(num_episodes):
+        _, info = env.reset(
+            seed=int(seed + ep_i),
+            options={'variation': ['block.mass', 'block.friction']},
+        )
+        theta = info.get('theta_true') or {'mass': float('nan'), 'friction': float('nan')}
+        goal = np.asarray(info.get('goal_state'), dtype=np.float32)
+
+        states, actions, frames = [], [], []
+        for _ in range(length):
+            raw = np.asarray(info['proprio'], dtype=np.float32)
+            grip_xy = raw[0:2]
+            obj_xy = raw[3:5]
+            obj_vxy = raw[14:16]
+            st = np.concatenate([grip_xy, obj_xy, obj_vxy]).astype(np.float32)
+            a = policy(raw)
+            states.append(st)
+            actions.append(a)
+            if render:
+                frame = _resize(np.asarray(env.render()), image_size)
+                frames.append(np.asarray(frame, dtype=np.float32) / 255.0)
+            for _ in range(frameskip):
+                _, _, term, trunc, info = env.step(a)
+                if term or trunc:
+                    _, info = env.reset(
+                        seed=int(seed + ep_i),
+                        options={'variation': ['block.mass', 'block.friction']},
+                    )
+                    theta = info.get('theta_true') or theta
+                    break
+        ep = {
+            'state': np.stack(states).astype(np.float32),
+            'action': np.stack(actions),
+            # order matches FetchPushSolver.theta_names
+            'theta_true': np.array(
+                [theta['mass'], theta['friction']], dtype=np.float32
+            ),
+            # planar (x, y) goal position; z is dropped to match the
+            # solver's 2-d object state, same convention as the state itself
+            'goal': goal[:2] if goal.size >= 2 else goal,
+        }
+        if render and frames:
+            ep['pixels'] = np.stack(frames).transpose(0, 3, 1, 2)
+        episodes.append(ep)
+    env.close()
+
+    _FETCH_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    tmp_path = cache_path.with_suffix('.tmp')
+    with open(tmp_path, 'wb') as f:
+        pickle.dump(episodes, f)
+    tmp_path.replace(cache_path)  # atomic: no other process sees a partial file
+
+    return episodes, None
+
+
 def env_episodes(
     env_id: str,
     num_episodes: int,
@@ -436,6 +682,8 @@ class EpisodeWindowDataset(Dataset):
             item['theta_true'] = torch.from_numpy(ep['theta_true']).float()
         if 'touch' in ep:
             item['touch'] = torch.from_numpy(ep['touch'][sl]).float()
+        if 'goal' in ep:
+            item['goal'] = torch.from_numpy(ep['goal']).float()
         item['episode'] = torch.tensor(ep_i)
         return item
 
@@ -469,7 +717,9 @@ __all__ = [
     'PokeWorldSim',
     'collect_stats',
     'env_episodes',
+    'fetch_episodes',
     'pokeworld_episodes',
+    'pusht_randomized_episodes',
     'pusht_contact_policy',
     'swm_dataset_episodes',
 ]

@@ -1,6 +1,8 @@
 import logging
 
 import gymnasium as gym
+
+from . import _mujoco_compat  # noqa: F401  (applies a scoped joint-type comparison fix on import; see that module's docstring)
 import numpy as np
 from stable_worldmodel import spaces as swm_spaces
 
@@ -148,8 +150,11 @@ class FetchWrapper(gym.Wrapper):
 
         # Inject explicit physical object placements only if the target object exists
         self._object_body_id = -1
+        self._current_theta_true = None
         if has_object:
             default_mass = 2.0
+            default_friction = 1.0
+            self._object_geom_id = -1
             if mujoco is not None:
                 body_id = mujoco.mj_name2id(
                     env.unwrapped.model, mujoco.mjtObj.mjOBJ_BODY, 'object0'
@@ -158,6 +163,14 @@ class FetchWrapper(gym.Wrapper):
                     self._object_body_id = body_id
                     default_mass = float(
                         env.unwrapped.model.body_mass[body_id]
+                    )
+                geom_id = mujoco.mj_name2id(
+                    env.unwrapped.model, mujoco.mjtObj.mjOBJ_GEOM, 'object0'
+                )
+                if geom_id >= 0:
+                    self._object_geom_id = geom_id
+                    default_friction = float(
+                        env.unwrapped.model.geom_friction[geom_id, 0]
                     )
 
             space_dict['block'] = swm_spaces.Dict(
@@ -181,6 +194,13 @@ class FetchWrapper(gym.Wrapper):
                         shape=(1,),
                         dtype=np.float64,
                         init_value=np.array([default_mass]),
+                    ),
+                    'friction': swm_spaces.Box(
+                        low=0.05,
+                        high=2.0,
+                        shape=(1,),
+                        dtype=np.float64,
+                        init_value=np.array([default_friction]),
                     ),
                 }
             )
@@ -230,11 +250,32 @@ class FetchWrapper(gym.Wrapper):
             self._apply_physical_variations(active_variations)
             changed_physics = True
 
-        # Always push current mass to the model — fixed-per-run via init_value sticks,
-        # and randomized-per-reset picks up the freshly sampled value.
+        # Always push current mass/friction to the model — fixed-per-run via
+        # init_value sticks, and randomized-per-reset picks up the freshly
+        # sampled value. Cache the realized values so info['theta_true']
+        # reports what actually ended up in the model, not just the sampled
+        # target (they're the same by construction here, but this is the
+        # honest source of truth for a PhysWM ground-truth theta).
+        self._current_theta_true = None
         if self._object_body_id >= 0 and mujoco is not None:
             mass = float(self.variation_space['block']['mass'].value[0])
             self.env.unwrapped.model.body_mass[self._object_body_id] = mass
+            friction = mass  # placeholder overwritten below if geom found
+            if self._object_geom_id >= 0:
+                friction = float(
+                    self.variation_space['block']['friction'].value[0]
+                )
+                self.env.unwrapped.model.geom_friction[
+                    self._object_geom_id, 0
+                ] = friction
+            self._current_theta_true = {
+                'mass': float(self.env.unwrapped.model.body_mass[
+                    self._object_body_id
+                ]),
+                'friction': float(self.env.unwrapped.model.geom_friction[
+                    self._object_geom_id, 0
+                ]) if self._object_geom_id >= 0 else float('nan'),
+            }
 
         if changed_physics and mujoco is not None:
             mujoco.mj_forward(
@@ -247,6 +288,7 @@ class FetchWrapper(gym.Wrapper):
         info['proprio'] = obs['observation']
         info['state'] = flat_obs
         info['goal_state'] = obs['desired_goal']
+        info['theta_true'] = self._current_theta_true
 
         return (flat_obs if self._flatten else obs), info
 
@@ -300,6 +342,7 @@ class FetchWrapper(gym.Wrapper):
         info['proprio'] = obs['observation']
         info['state'] = flat_obs
         info['goal_state'] = obs['desired_goal']
+        info['theta_true'] = self._current_theta_true
         return (
             (flat_obs if self._flatten else obs),
             reward,

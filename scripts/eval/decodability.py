@@ -88,10 +88,13 @@ def bench_cfg(
     detach_probe_input: bool = False,
     window: int = 8,
     tactile: bool = True,
+    benchmark: str = 'pokeworld',
+    quantize_theta: bool = False,
+    num_codes: int = 64,
 ) -> dict:
-    """The pokeworld bench config, inlined so this script is standalone."""
+    """Bench config, inlined so this script is standalone."""
     return {
-        'benchmark': 'pokeworld',
+        'benchmark': benchmark,
         'probe_source': probe_source,
         'probe_context': max(1, window // 2),
         'physics_loss_scope': 'context',
@@ -123,14 +126,27 @@ def bench_cfg(
             'dropout': 0.0,
             'detach_input': detach_probe_input,
             'init_scale': 0.01,
+            'quantize': quantize_theta,
+            'num_codes': num_codes,
         },
-        'solver': {'name': 'pokeworld', 'dt': 0.001, 'substeps': 20},
+        # dt/substeps must match each environment's integration, taken
+        # from scripts/train/config/bench/<benchmark>.yaml
+        'solver': dict(
+            {'pokeworld': {'dt': 0.001, 'substeps': 20},
+             'pusht': {'dt': 0.01, 'substeps': 10},
+             'pusht_rand': {'dt': 0.01, 'substeps': 10},
+             'fetch_push': {'dt': 0.01, 'substeps': 10},
+             'cartpole': {'dt': 0.01, 'substeps': 2}}[benchmark],
+            name=BENCHMARKS[benchmark]['solver'],
+        ),
         'data': {
             'num_episodes': episodes,
             'episode_length': length,
             'window': window,
             'stride': 1,
-            'require_context_touch': tactile,
+            'require_context_touch': (
+                tactile and BENCHMARKS[benchmark].get('tactile_index') is not None
+            ),
             'sim': {},
         },
     }
@@ -158,7 +174,7 @@ def train(
     """
     torch.manual_seed(seed)
     train_set, val_set = build_datasets(cfg, seed=seed)
-    spec = BENCHMARKS['pokeworld']
+    spec = BENCHMARKS[cfg['benchmark']]
     model = build_physwm(cfg, spec['state_dim'], spec['action_dim'])
     states, actions = collect_stats(train_set)
     model.fit_normalizers(states, actions)
@@ -398,10 +414,26 @@ def main():
     ap.add_argument('--probe-source', default='predicted',
                     choices=['predicted', 'encoded'])
     ap.add_argument('--detach-probe-input', action='store_true')
+    ap.add_argument(
+        '--benchmark', default='pokeworld',
+        choices=['pokeworld', 'pusht_rand', 'fetch_push'],
+        help='benchmarks carrying a ground-truth theta. `pusht_rand` is '
+             'PushT with per-episode physics; only k_p/k_v have a true '
+             'value, the remaining theta entries are constant and are '
+             'dropped from the R2 report. `fetch_push` is real Fetch '
+             'Push with per-episode (mass, friction) -- both have a '
+             'true value (the 2-parameter case, no stiffness analog).',
+    )
     ap.add_argument('--window', type=int, default=8)
     ap.add_argument('--no-tactile', action='store_true')
     ap.add_argument('--batch-size', type=int, default=32)
     ap.add_argument('--no-amp', action='store_true')
+    ap.add_argument(
+        '--quantize-theta', action='store_true',
+        help='route theta through a learned VQ codebook instead of a '
+             'continuous linear/MLP head (design-space ablation).',
+    )
+    ap.add_argument('--num-codes', type=int, default=64)
     ap.add_argument(
         '--theta-weight', type=float, default=100.0,
         help='weight on the theta-supervision term in the `theta_oracle` '
@@ -438,6 +470,9 @@ def main():
         detach_probe_input=args.detach_probe_input,
         window=args.window,
         tactile=not args.no_tactile,
+        benchmark=args.benchmark,
+        quantize_theta=args.quantize_theta,
+        num_codes=args.num_codes,
     )
     names = None
     results = {}
