@@ -149,6 +149,14 @@ class CartpoleDMControlWrapper(DMControlWrapper):
             physics, task, time_limit=_DEFAULT_TIME_LIMIT, **environment_kwargs
         )
         env = action_scale.Wrapper(env, minimum=-1.0, maximum=1.0)
+        # reset()'s per-episode variation sampling marks the model dirty on
+        # nearly every call, so this recompiles constantly; the old env's
+        # GL/EGL render context was never released before being dropped
+        # here, leaking a context per reset until the driver's context pool
+        # is exhausted and the next allocation hangs (reproduced: hangs
+        # deterministically after ~2 episodes' worth of resets).
+        if getattr(self, 'env', None) is not None:
+            self.env.close()
         self.env = env
         # Mark the environment as clean.
         self._dirty = False

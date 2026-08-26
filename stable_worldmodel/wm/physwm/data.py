@@ -504,7 +504,7 @@ def fetch_episodes(
 
 def _cartpole_episodes_subprocess(
     num_episodes, length, seed, frameskip, image_size, render,
-    batch_size=64, max_attempts=None, batch_timeout=300,
+    batch_size=8, max_attempts=None, batch_timeout=900,
 ):
     """Collect cartpole episodes via repeated calls to
     ``_cartpole_batch_worker.py``, isolating the native-SIGABRT risk (see
