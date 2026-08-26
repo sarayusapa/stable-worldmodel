@@ -68,3 +68,10 @@
 [05:59:52] DONE cartpole_xbench_seed0 rc=0 dur=516s
 [05:59:53] DONE cartpole_xbench_seed2 rc=0 dur=517s
 [05:59:53] DONE cartpole_xbench_seed1 rc=0 dur=517s
+[06:06:53] RETRY9 cartpole_xbench_seed0/1/2 -- contention dropped a lot (only A_fetch_claim's 3 jobs left running, GPU mem down to 4.5GB), re-running at episodes=32 (up from the 8ep sanity check) to get a less noisy small-N result while the pod is quiet.
+[06:06:53] START cartpole_xbench_seed0 (episodes=32, length=48)
+[06:06:53] START cartpole_xbench_seed1 (episodes=32, length=48)
+[06:06:53] START cartpole_xbench_seed2 (episodes=32, length=48)
+[06:22:29] DONE cartpole_xbench_seed2 rc=0 dur=936s
+[06:22:45] DONE cartpole_xbench_seed0 rc=0 dur=952s
+[06:23:09] DONE cartpole_xbench_seed1 rc=0 dur=976s

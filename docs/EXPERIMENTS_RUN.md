@@ -136,7 +136,7 @@ this repo's `*.log` convention).
 
 ---
 
-## 4. Cartpole — 8 episodes, run by me, complete (small-N, deadline-forced)
+## 4. Cartpole — 32 episodes, run by me, complete (small-N, scaling up as contention allows)
 
 **Benchmark:** DMControl Cartpole (MuJoCo via `dm_control`, a different
 binding path than Fetch's `gymnasium_robotics`). **No ground truth
@@ -168,14 +168,14 @@ from PushT's (32 vs. 48)**, documented here so it isn't mistaken for an
 inconsistency later.
 
 **Scope cut under a hard user deadline, in stages, all documented in
-`matrix.log`:** 512 -> 256 -> 32 -> 8 episodes. Each cut was forced by a
-real GL/EGL context-contention bottleneck in episode collection, not
-model instability — see the real bug found and fixed below, which
-independently required its own scope cuts before it was even isolated.
-**Final run is 8 episodes, 40 epochs, 328 train / 82 val windows — a
-small-N sanity check that the pipeline runs end to end, not a result
-that says anything about the model's cartpole performance.** All 3 seeds
-completed (rc=0).
+`matrix.log`:** 512 -> 256 -> 32 -> 8, then scaled back up to 32 and 64 as
+GPU/EGL contention eased once the Fetch matrix and PushT jobs finished.
+Each cut was forced by a real GL/EGL context-contention bottleneck in
+episode collection, not model instability — see the real bug found and
+fixed below. **This entry covers the 32-episode run (40 epochs, 1312
+train / 328 val windows) — still small-N, but a real step up from the
+8-episode sanity check; a 64-episode run is in progress as a further
+scale-up, see Status section.** All 3 seeds completed (rc=0).
 
 **Second real bug found and fixed, independent of the length/abort bug
 above:** `CartpoleDMControlWrapper.compile_model()`
@@ -192,18 +192,23 @@ so any remaining native abort only costs a retried batch, never the
 whole job — this is what let the length go back to the real 48 (matching
 PushT) instead of staying at the workaround value of 32.
 
-**Result (8 episodes — read as a sanity check, not a finding):** `probe`
-does not beat `nominal` in any seed (nominal RMSE 0.006-0.012 vs. probe
-0.06-0.13 — the fixed default theta predicts far better than any
-per-episode inference at this scale), and only beats `shuffled` in 2/3
-seeds by a razor-thin margin (0.0007-0.008). `path_a` is 4-5x *worse*
-than persistence in all 3 seeds (e.g. seed0: 1.098 vs. 0.200) — at
-328 training windows and 40 epochs, this reads as a data-starved model
-that hasn't learned anything useful yet, the same failure mode PokeWorld
-and Fetch both showed below their own data floors, not a claim that
-cartpole is unlearnable. **Re-running at a real episode count (512, or
-whatever the datafloor sweep pattern from PokeWorld suggests) once GPU/
-EGL contention eases is still an open item.**
+**Result (32 episodes — still small-N, but improving with scale):**
+`probe` now beats `shuffled` in **all 3 seeds** (gap 0.012-0.045, up from
+2/3 seeds and a razor-thin 0.0007-0.008 gap at 8 episodes) — a real,
+consistent improvement. `probe` still does not beat `nominal` in any seed
+(nominal RMSE 0.007-0.009 vs. probe 0.085-0.087 — the fixed default
+theta still predicts far better than per-episode inference at this
+scale). `path_a` is still worse than persistence in all 3 seeds, but the
+gap narrowed sharply for 2 of them (seed0: 0.389 vs. 0.189, was 1.098 vs.
+0.200 at 8ep; seed2: 0.267 vs. 0.189, was 0.818 vs. 0.201 at 8ep; seed1
+is the outlier, 1.089 vs. 0.243, barely improved). This trend — closing
+the persistence gap as episode count grows — is exactly what a
+data-starved model recovering with more data should look like, not
+evidence cartpole is unlearnable; it just hasn't crossed the floor yet.
+**Re-running at a real episode count (512, or whatever the datafloor
+sweep pattern from PokeWorld suggests) is still the real open item** —
+the 64-episode run in progress is another step in that direction, not
+the final answer.
 
 **Result dir:** `docs/cartpole-matrix/run-results/*.json` (3 files,
 committed), `docs/cartpole-matrix/run-logs/*.log` (local-only, per this
