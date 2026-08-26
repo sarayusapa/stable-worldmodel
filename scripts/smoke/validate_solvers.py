@@ -29,12 +29,24 @@ from stable_worldmodel.wm.physwm import (
     env_episodes,
     pokeworld_episodes,
 )
+from stable_worldmodel.wm.physwm.data import fetch_episodes
 
 
 def gather_transitions(bench: str, episodes: int, length: int, seed: int):
-    """Return ``(s_t, a_t, s_next)`` tensors of shape ``(N, 1, D)``."""
+    """Return ``(s_t, a_t, s_next, ep_id, theta_true)``, tensors of shape
+    ``(N, 1, D)`` for ``s``/``a``/``s_next``. ``theta_true`` is ``None`` when
+    the benchmark has no ground truth (``BENCHMARKS[bench]['has_theta_true']``
+    is ``False``).
+    """
     if bench == 'pokeworld':
         eps, _ = pokeworld_episodes(episodes, length, seed=seed, render=False)
+    elif bench == 'fetch_push':
+        # Generic env_episodes() does not randomize block.mass/friction and
+        # does not extract theta_true or Fetch's reduced planar state --
+        # fetch_episodes() is the only path that does all three correctly
+        # (see its docstring). Using env_episodes() here would silently
+        # collect episodes with unvaried, unrecorded ground truth.
+        eps, _ = fetch_episodes(episodes, length, seed=seed, render=False)
     else:
         eps = env_episodes(
             BENCHMARKS[bench]['env_id'],
@@ -56,7 +68,13 @@ def gather_transitions(bench: str, episodes: int, length: int, seed: int):
     def to(x):
         return torch.from_numpy(x).float().unsqueeze(1)
 
-    return to(s), to(a), to(s_next), torch.from_numpy(ep_id).long()
+    theta_true = None
+    if BENCHMARKS[bench].get('has_theta_true') and 'theta_true' in eps[0]:
+        theta_true = torch.from_numpy(
+            np.stack([e['theta_true'] for e in eps]).astype(np.float32)
+        )
+
+    return to(s), to(a), to(s_next), torch.from_numpy(ep_id).long(), theta_true
 
 
 def rmse(pred, target, scale):
@@ -90,7 +108,7 @@ def fit_theta(solver, s, a, s_next, scale, ep_id, steps=600, lr=0.05, seed=0):
 
 def report(bench, args):
     spec = BENCHMARKS[bench]
-    s, a, s_next, ep_id = gather_transitions(
+    s, a, s_next, ep_id, theta_true = gather_transitions(
         bench, args.episodes, args.length, args.seed
     )
     solver = build_solver(
@@ -117,22 +135,54 @@ def report(bench, args):
     )
     fit = rmse(pred, s_next, scale)
 
+    true = None
+    if theta_true is not None:
+        # theta_true is one row per episode; expand to one row per
+        # transition the same way fit_theta expands the free-fit theta.
+        true_theta = theta_true[ep_id]
+        true = rmse(solver(s, a, true_theta), s_next, scale)
+
     width = max(len(n) for n in names) + 1
-    print(f'{"dim":<{width}} {"persist":>10} {"nominal":>10} {"fitted":>10}')
+    header = f'{"dim":<{width}} {"persist":>10} {"nominal":>10}'
+    if true is not None:
+        header += f' {"true":>10}'
+    header += f' {"fitted":>10}'
+    print(header)
     for i, n in enumerate(names):
-        print(f'{n:<{width}} {base[i]:>10.4f} {nom[i]:>10.4f} {fit[i]:>10.4f}')
-    print(
-        f'{"MEAN":<{width}} {base.mean():>10.4f} '
-        f'{nom.mean():>10.4f} {fit.mean():>10.4f}'
-    )
+        row = f'{n:<{width}} {base[i]:>10.4f} {nom[i]:>10.4f}'
+        if true is not None:
+            row += f' {true[i]:>10.4f}'
+        row += f' {fit[i]:>10.4f}'
+        print(row)
+    footer = f'{"MEAN":<{width}} {base.mean():>10.4f} {nom.mean():>10.4f}'
+    if true is not None:
+        footer += f' {true.mean():>10.4f}'
+    footer += f' {fit.mean():>10.4f}'
+    print(footer)
     print('fitted theta (episode 0):')
     for i, n in enumerate(solver.theta_names):
         print(f'  {n:<20} {theta[0, i].item():>12.5f}')
-    return {
+    if theta_true is not None:
+        print('true theta (episode 0):')
+        for i, n in enumerate(solver.theta_names):
+            print(f'  {n:<20} {theta_true[0, i].item():>12.5f}')
+    if true is not None:
+        print(
+            f'true theta beats fitted oracle: {bool(true.mean() < fit.mean())} '
+            f'(true {true.mean():.4f} vs fitted {fit.mean():.4f} -- fitted '
+            f'should never be worse than true, since it optimizes directly '
+            f'against the same objective; true < fitted by a wide margin '
+            f'would point at a fit_theta optimization issue rather than a '
+            f'solver-form issue)'
+        )
+    out = {
         'persistence': base.mean().item(),
         'nominal': nom.mean().item(),
         'fitted': fit.mean().item(),
     }
+    if true is not None:
+        out['true'] = true.mean().item()
+    return out
 
 
 def main():
@@ -146,8 +196,18 @@ def main():
     ap.add_argument('--seed', type=int, default=0)
     args = ap.parse_args()
     # must match the transition interval of each environment
-    args.dt = {'pokeworld': 0.001, 'cartpole': 0.01, 'pusht': 0.01}
-    args.substeps = {'pokeworld': 20, 'cartpole': 2, 'pusht': 10}
+    args.dt = {
+        'pokeworld': 0.001,
+        'cartpole': 0.01,
+        'pusht': 0.01,
+        'fetch_push': 0.01,
+    }
+    args.substeps = {
+        'pokeworld': 20,
+        'cartpole': 2,
+        'pusht': 10,
+        'fetch_push': 10,
+    }
 
     results = {b: report(b, args) for b in args.benchmarks}
 

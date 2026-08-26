@@ -552,8 +552,13 @@ class FetchPushSolver(PhysicsSolver):
         obj = state[..., 2:4]
         obj_vel = state[..., 4:6]
 
-        # --- gripper: kinematic, parameter-free (fast joint control)
-        gripper = gripper + action[..., 0:2] * self.action_scale
+        # --- gripper: kinematic, parameter-free (fast joint control).
+        # action_scale is the displacement for one whole TRANSITION, but
+        # step() runs once per substep, so divide it out here -- otherwise
+        # the gripper moves action_scale * substeps per transition instead
+        # of action_scale (confirmed: this was a real 10x overshoot with
+        # substeps=10, see progress.md 2026-08-26 validate_solvers.py entry).
+        gripper = gripper + action[..., 0:2] * (self.action_scale / self.substeps)
 
         # --- contact: soft penetration spring, fixed stiffness/geometry
         delta = obj - gripper

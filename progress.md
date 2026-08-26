@@ -63,8 +63,293 @@ Copy this block for each new run.
 
 ## Log
 
+### 2026-08-26 — Gripper overshoot fixed in `FetchPushSolver`; re-verified with `validate_solvers.py`
 
-### 2026-08-25 16:32 — [Data-floor sweep (episode-budget scaling)] `encoder_free_floor` (2048ep re-run, logged post hoc)
+Follow-up to the entry directly below. Applies the one-line fix that entry
+identified but did not apply, and re-checks it.
+
+- **Command:** same as below, plus a second run at `--episodes 32 --length
+  48 --steps 1200` to check whether the residual gap shrinks with more
+  data/optimization.
+- **Config / commit / hardware:** same scratch-venv setup as below, on top
+  of the `solvers.py` edit (`gripper = gripper + action[..., 0:2] *
+  (self.action_scale / self.substeps)`, replacing the undivided
+  `self.action_scale`). Not yet committed.
+
+```
+# 8 episodes (same scale as the pre-fix run, for direct comparison)
+dim           persist    nominal       true     fitted
+gripper_x      0.0503     0.0511     0.0511     0.0511
+gripper_y      0.0527     0.0322     0.0322     0.0322
+object_vx      1.0683     8.4973     1.7606     1.2323
+object_vy      1.0704    10.7244     1.4362     1.3551
+MEAN           0.3877     3.2289     0.5596     0.4581
+fetch_push   persist 0.3877  nominal 3.2289  fitted 0.4581  -> SOLVER DOES NOT BEAT PERSISTENCE
+
+# 32 episodes, 1200 fit steps
+dim           persist    nominal       true     fitted
+gripper_x      0.0471     0.0456     0.0456     0.0456
+gripper_y      0.0508     0.0311     0.0311     0.0311
+object_vx      1.1596    10.8793     2.9730     1.3271
+object_vy      1.1374    12.1922     3.4093     1.3625
+MEAN           0.4115     3.8680     1.0877     0.4725
+fetch_push   persist 0.4115  nominal 3.8680  fitted 0.4725  -> SOLVER DOES NOT BEAT PERSISTENCE
+```
+
+- **Notes:** The fix does exactly what the arithmetic predicted:
+  `gripper_x`/`gripper_y` fitted/true/nominal RMSE dropped from ~15-18x
+  worse than persistence to matching or beating it (`0.0511` vs `0.0503`,
+  `0.0322` vs `0.0527`) at both scales, and `nominal` MEAN dropped from
+  3.84/3.87 to 3.23/3.87 (nominal isn't expected to be good, it's the
+  fixed-default-theta baseline; the point is the gripper component of it
+  specifically is fixed). The "true theta beats fitted oracle" inversion
+  from the pre-fix run is also gone at 8 episodes (`true 0.5596 > fitted
+  0.4581`, the expected ordering, oracle wins).
+
+  **What is NOT fully resolved:** overall `fitted` MEAN still does not
+  clearly beat `persistence` (0.4581 vs 0.3877 at 8 episodes; 0.4725 vs
+  0.4115 at 32), driven entirely by `object_vx`/`object_vy` — unlike
+  PokeWorld/Cart-pole/Push-T, where the oracle fit beats persistence by
+  1-3 orders of magnitude (`\Cref{tab:solver-adequacy}`). The gap did not
+  close between 8 and 32 episodes (if anything `true` got worse, 0.56 ->
+  1.09, plausibly because a wider sample includes episodes further from
+  where `contact_stiffness=400` — fixed, not fit — happens to be a good
+  approximation). This is a real, secondary open question, smaller in
+  magnitude than the gripper bug and not yet root-caused: candidates are
+  the fixed `contact_stiffness` being miscalibrated against real Fetch
+  MuJoCo contact response, or the linear-friction/point-mass
+  approximation itself being a worse match to Fetch than it is to
+  PokeWorld. Not investigated further here — this machine has no GPU and
+  the matrix-scale (256ep) data collection was not attempted locally.
+  **Recommendation:** re-run this same check at 256 episodes on the GPU
+  pod before writing a Fetch row into `\Cref{tab:solver-adequacy}`; if the
+  gap persists at that scale, it is worth a caption rather than another
+  code hunt, the same way Push-T's disc-approximation caveat is handled.
+
+  **Fully resolved:** the theta-independent 10x gripper overshoot, which
+  was large enough to be the dominant confound in every metric the Fetch
+  matrix (below) reported, including the "probe beats true" anomaly that
+  motivated this whole check.
+
+### 2026-08-26 — `validate_solvers.py` extended to `fetch_push`; found the gripper is theta-independent AND overshoots by 10x
+
+Follow-up to the entry directly below ("Open, unresolved from this batch").
+Resolves the "probe theta beats true theta" anomaly with a real, verified
+cause, not a training or reporting artifact.
+
+- **Command:** `SWM_FETCH_CACHE_DIR=<scratch dir> MUJOCO_GL=cgl python
+  scripts/smoke/validate_solvers.py --benchmarks fetch_push --episodes 8
+  --length 48 --seed 0`
+- **Config:** default `validate_solvers.py` args (8 episodes, length 48,
+  600 fit steps, lr 0.05), `fetch_push` solver `dt=0.01, substeps=10`
+  (newly added to the script, matching `decodability.py`'s existing
+  per-benchmark dt/substeps table).
+- **Seed(s):** 0.
+- **Commit / working tree:** `54bc938` + uncommitted local changes to
+  `scripts/smoke/validate_solvers.py` (added a `fetch_push` branch to
+  `gather_transitions` — the generic `env_episodes()` path does not
+  randomize `block.mass`/`block.friction` or extract `theta_true` for
+  Fetch, only `fetch_episodes()` does; added `fetch_push` to the
+  `dt`/`substeps` tables; added a `true`-theta RMSE column alongside
+  persistence/nominal/fitted). Not committed pending a decision on the bug
+  below.
+- **Hardware:** CPU, local Mac (no GPU available in this environment);
+  scratch venv, `torch==2.13.0`, `mujoco==3.12.0`, `gymnasium-robotics==1.4.2`.
+- **Data:** `fetch_push`, 8 episodes x 48 steps (smoke scale, not the
+  256-episode matrix scale — sufficient to isolate this bug, which is
+  independent of theta and episode count).
+- **Duration:** ~1 minute.
+- **Status:** pass (script ran); the *result* is a fail for the solver.
+- **Artifacts:** none kept (stdout captured directly below).
+
+```
+dim           persist    nominal       true     fitted
+gripper_x      0.0503     0.9080     0.9080     0.9080
+gripper_y      0.0527     0.7893     0.7893     0.7893
+object_x       0.0488     0.0473     0.0448     0.0450
+object_y       0.0357     0.0478     0.0342     0.0338
+object_vx      1.0683     7.1589     1.2804     1.1507
+object_vy      1.0704    14.0757     1.9959     1.3936
+MEAN           0.3877     3.8378     0.8421     0.7201
+```
+`fetch_push   persist 0.3877  nominal 3.8378  fitted 0.7201  -> SOLVER DOES
+NOT BEAT PERSISTENCE`
+
+- **Notes:** Read directly from `FetchPushSolver` in
+  `stable_worldmodel/wm/physwm/solvers.py`. The base class's `forward()`
+  loops `for _ in range(self.substeps): state = self.step(state, action,
+  p, dt)` — correct for the object's ODE integration (`dt` is the
+  per-substep interval, and integrating the continuous acceleration in 10
+  finer steps approximates one 0.1s transition). But `FetchPushSolver.step`
+  updates the gripper with `gripper = gripper + action[..., 0:2] *
+  self.action_scale` — a **discrete per-transition kinematic displacement**,
+  not a rate — applied on *every* substep instead of once. With
+  `substeps=10, action_scale=0.05`, the gripper moves `10 x 0.05 x action
+  = 0.5 x action` per transition instead of the intended `0.05 x action`,
+  a 10x overshoot. This is exactly consistent with the ~15-18x RMSE blowup
+  above (`0.9080 / 0.0503 ~ 18x`, `0.7893 / 0.0527 ~ 15x`, in scaled-RMSE
+  units where the mismatch compounds with the gripper's own variance) —
+  confirmed arithmetically, not just by the ratio matching.
+
+  **Consequences for every Fetch matrix result logged in the entry below:**
+  1. The gripper term has **zero theta dependence** (`mass`/`friction`
+     never enter it), so no amount of probe accuracy, self-distillation,
+     or oracle fitting can correct it — `true` and `fitted` gripper RMSE
+     are bit-identical to `nominal`'s in the table above. This is a
+     constant floor on Path B's prediction error in every one of the 8
+     jobs, unrelated to whether theta is being recovered well.
+  2. It explains the "probe beats true" anomaly directly: in `F`'s
+     `substitution`/`multi_horizon` tables, `true`/`shuffled`/`nominal`
+     theta all pay the same broken gripper cost, while the model's own
+     probe theta was distilled against Path A's prediction (a *learned*
+     model that presumably gets gripper motion roughly right, since it
+     is trained on real trajectories with no such bug) — so "probe" isn't
+     winning by understanding physics better, the comparison is
+     confounded by a bug that penalizes the other three sources equally
+     and unfairly.
+  3. **The frozen solver does not beat persistence even at the oracle
+     fit** (0.7201 vs 0.3877 persistence, 8-episode smoke scale) — this
+     is a more fundamental problem than the mass/friction
+     non-identifiability documented in `READING_THE_LOGS.md`. Before that
+     documented gap is even reachable, Fetch fails the solver-adequacy
+     precondition every other benchmark passes cleanly
+     (`\Cref{tab:solver-adequacy}`: PokeWorld 0.0001, Cart-pole 0.0025,
+     Push-T 0.021, all far below persistence). Fetch has no comparable
+     entry yet, and by this measurement it would currently read "fitted
+     0.72 > persistence 0.39" — the solver fails its own adequacy check.
+  4. Object-dimension fit (`object_vx`/`object_vy`) does improve from
+     nominal to true to fitted (7.16 -> 1.28 -> 1.15 for vx) but even the
+     oracle fit does not beat persistence's 1.07 at this 8-episode smoke
+     scale — a separate, smaller-magnitude question from the gripper bug,
+     worth re-checking once the gripper is fixed and at the full 256/2048
+     episode scale before concluding anything about mass/friction
+     identifiability from prediction quality alone.
+
+  **Not yet done:** the likely one-line fix (divide the gripper's
+  `action_scale` term by `self.substeps`, or apply it only on the first
+  substep) has not been applied to `solvers.py`, and the 256-episode
+  Fetch matrix has not been re-run against a fixed solver. Both are
+  necessary before any Fetch number (theta recovery *or* prediction
+  quality *or* functional use) is safe to cite in the paper — the matrix
+  entry below predates this discovery and should not be treated as
+  reflecting the intended solver.
+
+### 2026-08-26 — Fetch matrix, 256 episodes, 8 jobs (A/B/C/H/F), logged post hoc
+
+- **Command:** `matrix.log` records an orchestrator run starting `2026-08-26
+  00:20:30 UTC`; the per-job exact command lines are not in the repo (jobs
+  were launched by whatever driver produced `docs/fetch-matrix-256ep/`,
+  which is not `overnight.py` since that script's dry-run had never
+  executed per the prior "Open items" entry). Config is fully recoverable
+  from each JSON's `meta` block instead — see below.
+- **Config:** `encoder=tiny_cnn, window=8 (16 for F), tactile=True,
+  episodes=256, length=48, epochs=60, batch_size=32, amp=True`. Per-job
+  `conditions` / `probe_source` / `detach_probe_input` differences:
+  - `A_fetch_claim_seed{0,1,2}` — `conditions=predictive,physwm`,
+    `probe_source=predicted`, `detach_probe_input=False` (the main claim,
+    3 seeds)
+  - `B_fetch_preaction_seed0` — `conditions=physwm`,
+    `probe_source=encoded` (pre-action-latent ablation)
+  - `C_fetch_dataset_target_seed0` — `conditions=state_target` (probe
+    regressed on the dataset label directly, not self-distilled)
+  - `C_fetch_posthoc_seed0` — `conditions=physwm`,
+    `detach_probe_input=True` (probe reads a detached latent — fits a
+    read-out without shaping the representation)
+  - `H_fetch_vq_seed0` — `conditions=physwm`, VQ-theta ablation
+  - `F_fetch_functional_seed0` — `functional_use.py`, not
+    `decodability.py`; `window=16`, `theta_supervision=0.0`
+- **Seed(s):** 0, 1, 2 for group A; seed 0 only for B/C/H/F.
+- **Commit / working tree:** `HEAD` at merge time was `54bc938` (this run's
+  results were added in that same commit); exact commit/dirty-flag the jobs
+  themselves ran against is not recorded in the JSON `meta` (no
+  `run_meta.json`-style provenance for this batch) — `unknown`.
+- **Hardware:** unknown (not recorded for this batch).
+- **Data:** `fetch_push`, 256 episodes x 48 steps; 10496 train / 2624 val
+  windows after the observability filter (8448 / 2112 for F, window 16).
+- **Duration:** per `matrix.log` — group A sequential (~3000-3900s/seed),
+  then B/C/C/H/F in parallel (~2000-2250s each). Wall clock start to finish
+  of the parallel batch: 00:20:30 -> 03:14:52 UTC, ~3h.
+- **Status:** pass, `rc=0` for all 8 jobs.
+- **Artifacts:** `docs/fetch-matrix-256ep/run-results/*.json` (8 files),
+  `docs/fetch-matrix-256ep/run-logs/matrix.log`. Per-job raw `.log` files
+  were **not** committed (kept local only, per this repo's `*.log`
+  gitignore convention, per `READING_THE_LOGS.md`).
+
+**theta recovery — val R² (group A, `predictive` vs `physwm`, 3 seeds)**
+
+| seed | predictive/decodable mass | predictive/decodable friction | predictive/own_probe mass | predictive/own_probe friction | physwm/decodable mass | physwm/decodable friction | physwm/own_probe mass | physwm/own_probe friction |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | -0.8154 | -0.2690 | -2.1130 | 0.0005 | -0.7064 | -0.4502 | -2.7537 | -2.7679 |
+| 1 | -0.6688 | -0.7250 | -2.0463 | -0.0063 | -0.3423 | -0.4622 | -2.7533 | -2.7647 |
+| 2 | -0.3466 | -1.1508 | -2.0582 | -0.0031 | -0.3104 | -0.3738 | -2.7071 | -2.8135 |
+
+**theta recovery — val R² (ablations, seed 0, `physwm/own_probe` unless noted)**
+
+| job | mass | friction |
+| --- | --- | --- |
+| B (pre-action latent) | -2.7526 | -2.7735 |
+| C (dataset-target, not self-distilled) | -2.7567 | -2.7710 |
+| C (posthoc, detached probe input) | -2.7188 | -2.7676 |
+| H (VQ-theta) | -1.6650 | -1.7436 |
+
+**prediction/fidelity RMSE, `predictive` vs `physwm` (group A, seed 0; other
+seeds/jobs follow the same pattern, see JSON)**
+
+| metric | predictive | physwm |
+| --- | --- | --- |
+| path_a_vs_dataset | 0.4203 | 0.4213 |
+| path_b_vs_teacher | 8.9898 | 0.7709 |
+| persistence_vs_dataset | 0.6229 | 0.6229 |
+
+**functional use (`F_fetch_functional_seed0`)**
+
+- Sensitivity (prediction shift from scaling theta 1.1x): mass 0.0437,
+  friction 0.00017 — friction is ~250x less load-bearing than mass in the
+  frozen solver at this window (16 frames, 0.01s dt x 10 substeps).
+- Substitution (one-step Path B RMSE vs real `s_next`): true 5.549, probe
+  1.476, shuffled 7.072, nominal 21.415 — **probe theta scores lower error
+  than true theta**, which the "shuffled ~ true" gap (-0.011 in the A-job
+  equivalent) does not explain by itself. Flagged as an open question below,
+  not yet understood.
+- Multi-horizon (H=1..7): probe stays in [1.24, 2.67], true in [4.84, 5.30],
+  shuffled in [6.49, 6.68], nominal in [19.7, 22.0] — same probe-beats-true
+  pattern holds at every horizon, it does not close with H.
+- Task success (7-step solver rollout, threshold 0.05): **0.03125 for all
+  four sources** (true/probe/shuffled/nominal) — currently a degenerate,
+  fixed 1/32 fraction with no discriminative signal.
+
+- **Notes:** Full interpretation guide written alongside this batch:
+  `docs/fetch-matrix-256ep/READING_THE_LOGS.md`. Two things established by
+  reading the actual code, not guessed:
+  1. `dynamics_coordinates()` in `decodability.py` has no `fetch_push`
+     branch, so the tables above report raw `(mass, friction)` rather than
+     the ratio `friction/mass` that should actually be identifiable —
+     `FetchPushSolver`'s `m*dv/dt = F_contact - friction*v` has the same
+     mass/friction degeneracy PokeWorld resolves with its `touch` channel,
+     and Fetch's state has no analogous force signal. This is a benchmark
+     reporting gap, not (necessarily) a training failure.
+  2. Even the supervised ceiling (`*/decodable`) is negative for every
+     parameter, every job — 256 episodes may be below Fetch's own data
+     floor (PokeWorld's equivalent ceiling needed 2048 episodes to turn
+     positive; see the 2026-08-25 data-floor entries above).
+
+  **Open, unresolved from this batch (do not write into the paper until
+  checked):** F's substitution/multi-horizon tables show probe-derived
+  theta producing *lower* one-step error against real `s_next` than the
+  actual ground-truth theta fed through the same frozen solver, at every
+  horizon. `FetchPushSolver` has no entry in the solver-adequacy table
+  (`validate_solvers.py`, `\Cref{tab:solver-adequacy}` in the paper) the
+  way PokeWorld/Cart-pole/Push-T do, so there is no oracle-fit check yet
+  establishing whether the frozen solver, given the best possible
+  per-episode theta, can even explain real Fetch transitions to low error.
+  Until that check exists, "true theta loses to probe theta" could mean
+  the solver is inadequate for Fetch (an oracle-fit theta would beat both),
+  or a units/box mismatch between raw "true" theta and the probe's
+  sigmoid-mapped box output, or a genuine anomaly. Run
+  `validate_solvers.py` against `fetch_push` before citing this table in
+  the paper.
+
+
 
 - **Params:** ``
 - **Why this run:** Data-floor sweep: how many episodes are needed before theta recovery is even possible. The 512-episode default was found too small (~1300 touch-filtered windows, below the recoverable threshold); this sweep establishes the actual floor.
@@ -2977,6 +3262,28 @@ Identifiability certificate (final-epoch val R^2, PokeWorld only):
 
 ## Open items
 
+- [x] **Fix `FetchPushSolver`'s gripper update** (`solvers.py`) — done
+      2026-08-26, see log entry. Was applying `action[..., 0:2] *
+      action_scale` once per substep instead of once per transition, a
+      10x overshoot with zero theta dependence. Fix verified locally at
+      8 and 32 episodes (gripper RMSE now matches/beats persistence); not
+      yet verified at the 256-episode matrix scale (no GPU on this
+      machine).
+- [ ] **Re-run the 256-episode Fetch matrix (A/B/C/H/F)** now that the
+      gripper fix is in — every Fetch number in the 2026-08-26 "Fetch
+      matrix" entry above predates the fix and should not be cited in the
+      paper as-is.
+- [ ] **Root-cause the residual Fetch solver-adequacy gap**: even after
+      the gripper fix, oracle-fit theta only ties persistence
+      (0.47 vs 0.41 at 32 episodes) rather than beating it by orders of
+      magnitude the way PokeWorld/Cart-pole/Push-T do. Candidates:
+      `contact_stiffness=400` is a fixed, unfit constant; the
+      linear-friction/point-mass approximation may not suit Fetch as well
+      as it suits PokeWorld. See the 2026-08-26 "Gripper overshoot fixed"
+      entry for detail.
+- [ ] Commit the local changes to `scripts/smoke/validate_solvers.py`
+      (working `fetch_push` branch + `true`-theta RMSE column) and
+      `stable_worldmodel/wm/physwm/solvers.py` (the gripper fix) together.
 - [ ] **Run the aligned 20-experiment matrix on CUDA** once a GPU is available:
       `MUJOCO_GL=egl .venv-phy-wm-gpu/bin/python scripts/eval/overnight.py --seeds 0,1,2`.
       The dry-run resolves 16 light and 4 heavy experiments, but none has been
