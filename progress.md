@@ -3273,17 +3273,26 @@ Identifiability certificate (final-epoch val R^2, PokeWorld only):
       gripper fix is in — every Fetch number in the 2026-08-26 "Fetch
       matrix" entry above predates the fix and should not be cited in the
       paper as-is.
-- [ ] **Root-cause the residual Fetch solver-adequacy gap**: even after
-      the gripper fix, oracle-fit theta only ties persistence
-      (0.47 vs 0.41 at 32 episodes) rather than beating it by orders of
-      magnitude the way PokeWorld/Cart-pole/Push-T do. Candidates:
-      `contact_stiffness=400` is a fixed, unfit constant; the
-      linear-friction/point-mass approximation may not suit Fetch as well
-      as it suits PokeWorld. See the 2026-08-26 "Gripper overshoot fixed"
-      entry for detail.
-- [ ] Commit the local changes to `scripts/smoke/validate_solvers.py`
-      (working `fetch_push` branch + `true`-theta RMSE column) and
-      `stable_worldmodel/wm/physwm/solvers.py` (the gripper fix) together.
+- [x] **Root-cause the residual Fetch solver-adequacy gap** — checked at
+      real matrix scale 2026-08-26 (`validate_solvers.py --benchmarks
+      fetch_push --episodes 256 --length 48 --steps 1200`, GPU pod):
+      confirmed real, not a toy-scale artifact. `gripper_x`/`gripper_y`
+      and now also `object_x`/`object_y` are clean post-fix (fitted ties
+      or beats persistence), but `object_vx`/`object_vy` still don't:
+      fitted MEAN 0.4833 vs persist 0.4109. The oracle fit (0.4833) does
+      correctly beat the true theta (1.3823) — confirms this is not an
+      optimization bug — so the gap is in the solver's functional form
+      itself: `contact_stiffness=400` fixed/unfit, and/or the
+      linear-friction/point-mass approximation not suiting Fetch's real
+      contact dynamics as well as it suits PokeWorld. Raw log:
+      `docs/solver-adequacy/fetch_push_256ep.log`. Not further
+      root-caused past this (which term is at fault) — worth a caption
+      in the paper rather than more code-hunting, the same way PushT's
+      disc-approximation caveat is handled.
+- [x] Committed `scripts/smoke/validate_solvers.py` (working `fetch_push`
+      branch + `true`-theta RMSE column) and
+      `stable_worldmodel/wm/physwm/solvers.py` (the gripper fix) together,
+      2026-08-26 (commit `03fa29b`).
 - [ ] **Run the aligned 20-experiment matrix on CUDA** once a GPU is available:
       `MUJOCO_GL=egl .venv-phy-wm-gpu/bin/python scripts/eval/overnight.py --seeds 0,1,2`.
       The dry-run resolves 16 light and 4 heavy experiments, but none has been
