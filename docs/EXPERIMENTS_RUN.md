@@ -136,7 +136,7 @@ this repo's `*.log` convention).
 
 ---
 
-## 4. Cartpole — 512 episodes, run by me, in progress
+## 4. Cartpole — 8 episodes, run by me, complete (small-N, deadline-forced)
 
 **Benchmark:** DMControl Cartpole (MuJoCo via `dm_control`, a different
 binding path than Fetch's `gymnasium_robotics`). **No ground truth
@@ -167,14 +167,47 @@ specifically — **cartpole's episode length now deliberately differs
 from PushT's (32 vs. 48)**, documented here so it isn't mistaken for an
 inconsistency later.
 
-**Early smoke-test signal (8 episodes, 2 epochs, toy scale):** Path A
-scored *worse* than persistence (2.34 vs. 0.42) — at this toy scale
-that's expected (2 epochs is essentially no training), not evidence
-against the model; the real 40-epoch run is what will actually test
-this.
+**Scope cut under a hard user deadline, in stages, all documented in
+`matrix.log`:** 512 -> 256 -> 32 -> 8 episodes. Each cut was forced by a
+real GL/EGL context-contention bottleneck in episode collection, not
+model instability — see the real bug found and fixed below, which
+independently required its own scope cuts before it was even isolated.
+**Final run is 8 episodes, 40 epochs, 328 train / 82 val windows — a
+small-N sanity check that the pipeline runs end to end, not a result
+that says anything about the model's cartpole performance.** All 3 seeds
+completed (rc=0).
 
-**Result dir:** `/workspace/physwm-artifacts/runs/pusht-cartpole-matrix/cartpole_xbench_*.json`
-(not yet pulled to this repo).
+**Second real bug found and fixed, independent of the length/abort bug
+above:** `CartpoleDMControlWrapper.compile_model()`
+(`stable_worldmodel/envs/dmcontrol/cartpole.py`) reassigned `self.env` on
+every `reset()` (physics variation triggers a recompile almost every
+reset) without ever closing the previous `self.env` first — a GL/EGL
+render-context leak on nearly every episode. Reproduced directly: a solo
+worker process reliably died or hung after exactly 2 episodes regardless
+of seed, which random physics divergence would not do consistently.
+Fixed with one line (`self.env.close()` before reassignment, commit
+`bf4e356`). Episode collection was additionally moved to disposable
+per-episode/per-batch subprocesses (`scripts/eval/_cartpole_batch_worker.py`)
+so any remaining native abort only costs a retried batch, never the
+whole job — this is what let the length go back to the real 48 (matching
+PushT) instead of staying at the workaround value of 32.
+
+**Result (8 episodes — read as a sanity check, not a finding):** `probe`
+does not beat `nominal` in any seed (nominal RMSE 0.006-0.012 vs. probe
+0.06-0.13 — the fixed default theta predicts far better than any
+per-episode inference at this scale), and only beats `shuffled` in 2/3
+seeds by a razor-thin margin (0.0007-0.008). `path_a` is 4-5x *worse*
+than persistence in all 3 seeds (e.g. seed0: 1.098 vs. 0.200) — at
+328 training windows and 40 epochs, this reads as a data-starved model
+that hasn't learned anything useful yet, the same failure mode PokeWorld
+and Fetch both showed below their own data floors, not a claim that
+cartpole is unlearnable. **Re-running at a real episode count (512, or
+whatever the datafloor sweep pattern from PokeWorld suggests) once GPU/
+EGL contention eases is still an open item.**
+
+**Result dir:** `docs/cartpole-matrix/run-results/*.json` (3 files,
+committed), `docs/cartpole-matrix/run-logs/*.log` (local-only, per this
+repo's `*.log` convention).
 
 ---
 

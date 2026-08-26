@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "benchmark": "cartpole",
+    "physics_target": "path_a",
+    "encoder": "tiny_cnn",
+    "epochs": 40,
+    "episodes": 8,
+    "length": 48,
+    "window": 8,
+    "seed": 2,
+    "theta_names": [
+      "cart_mass",
+      "pole_mass",
+      "pole_half_length",
+      "gravity",
+      "force_gain",
+      "cart_damping"
+    ],
+    "windows": {
+      "train": 328,
+      "val": 82
+    }
+  },
+  "substitution": {
+    "probe": 0.06324030458927155,
+    "shuffled": 0.0639348179101944,
+    "nominal": 0.011024342849850655
+  },
+  "beats_nominal": false,
+  "beats_shuffled": true,
+  "shuffled_minus_probe": 0.0006945133209228516,
+  "sensitivity": {
+    "cart_mass": 0.027166854590177536,
+    "pole_mass": 0.003552929265424609,
+    "pole_half_length": 0.01923888735473156,
+    "gravity": 0.004911312833428383,
+    "force_gain": 0.03232541307806969,
+    "cart_damping": 0.0036122456658631563
+  },
+  "theta_spread": {
+    "cart_mass": 0.027885787189006805,
+    "pole_mass": 0.07089563459157944,
+    "pole_half_length": 0.018859844654798508,
+    "gravity": 0.6923496723175049,
+    "force_gain": 0.39124739170074463,
+    "cart_damping": 0.6186083555221558
+  },
+  "prediction": {
+    "path_a": 0.8184412757539822,
+    "persistence": 0.20074974795656383
+  }
+}
