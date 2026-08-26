@@ -178,9 +178,88 @@ this.
 
 ---
 
+---
+
+## 5. Fetch matrix re-run — 256 episodes, gripper fix applied, 5/8 complete
+
+Re-run of section 2's matrix against the corrected `FetchPushSolver`
+(commit `03fa29b` — the gripper's action-scale term was applied once per
+substep instead of once per transition, a 10x overshoot with zero theta
+dependence). Same config as the original: `tiny_cnn` encoder, 256
+episodes, length 48, window 8 (16 for F), 60 epochs, batch 32.
+
+**Done (rc=0):** `B_fetch_preaction_seed0`, `C_fetch_dataset_target_seed0`,
+`C_fetch_posthoc_seed0`, `H_fetch_vq_seed0`, `F_fetch_functional_seed0`.
+**Still running:** `A_fetch_claim_seed{0,1,2}` (the primary claim, 3 seeds).
+
+**theta recovery — val R² (seed 0, `own_probe`/`decodable`)**
+
+| job | mass (own_probe) | friction (own_probe) | mass (decodable) | friction (decodable) |
+| --- | --- | --- | --- | --- |
+| B (pre-action) | -2.749 | -2.773 | -0.445 | -0.331 |
+| C (dataset-target) | -2.756 | -2.771 | -0.268 | -0.686 |
+| C (posthoc) | -2.651 | -2.758 | -0.561 | -0.686 |
+| H (VQ-theta) | -1.824 | -1.563 | -0.171 | -0.272 |
+
+Still negative across the board, including the supervised ceiling
+(`decodable`) — consistent with the pre-fix finding that 256 episodes is
+likely below Fetch's own data floor, not something the gripper fix alone
+resolves (theta recovery was never the gripper's fault; the gripper term
+has zero theta dependence by construction).
+
+**F (functional use) — the "probe beats true theta" anomaly, re-checked
+post-fix:** still present. `substitution`: probe 1.535, true 6.984,
+shuffled 7.357, nominal 22.364 — probe still scores far below true theta
+at every `multi_horizon` step (probe 1.3-8.3 vs true 10.9-22.7). Since the
+gripper bug (theta-independent, identical cost for every theta source) is
+now fixed and the pattern persists, it was never solely a gripper
+artifact. Better explanation, given section on solver-adequacy below:
+Path B's probe theta is distilled against Path A's own prediction, not
+real physics, and the frozen solver has a confirmed adequacy gap against
+real Fetch dynamics — so probe theta "wins" by matching what Path A
+predicts, not by being more physically correct. `task_success` is still
+degenerate (0.03125 for all four sources, uninformative at this
+threshold/horizon).
+
+**Result dir:** `docs/fetch-matrix-256ep-fixed/run-results/*.json` (5 of
+8, committed), `docs/fetch-matrix-256ep-fixed/run-logs/*.log`.
+
+---
+
+## 6. Fetch solver-adequacy check — 256 episodes, complete
+
+`scripts/smoke/validate_solvers.py --benchmarks fetch_push --episodes 256
+--length 48 --steps 1200` — checks whether the frozen `FetchPushSolver`,
+given the *best possible* per-episode theta (gradient-fit directly
+against the objective, not learned), can explain real Fetch transitions.
+Previously only checked at 8/32 episodes locally (no GPU); this is the
+real matrix scale.
+
+**Result:** gripper fix holds at scale (`gripper_x`/`gripper_y` and now
+also `object_x`/`object_y` fitted RMSE matches/beats persistence). But
+`object_vx`/`object_vy` still don't: overall fitted MEAN 0.4833 vs.
+persistence 0.4109 — **the solver does not beat persistence even at its
+best-possible fit.** The oracle fit does correctly beat true theta
+(0.4833 vs 1.3823), which rules out an optimization bug — the gap is in
+the solver's functional form itself (`contact_stiffness=400` fixed and
+unfit, and/or the linear-friction/point-mass approximation not suiting
+Fetch's real contact dynamics as well as it suits PokeWorld). Not
+root-caused further than that; treat as a caption-worthy limitation in
+the paper, the same way PushT's disc-approximation is handled, rather
+than a bug to keep hunting.
+
+**Result dir:** `docs/solver-adequacy/fetch_push_256ep.log` (local only,
+`*.log` convention).
+
+---
+
 ## Status as of writing
 
-All 9 PushT/Cartpole jobs running (GPU ~100% utilized). Once complete:
-JSON results + logs will be pulled down, documented the same way as the
-Fetch matrix (`READING_THE_LOGS.md`-style guide), logged into
-`progress.md`, and pushed to `phy-wm`.
+PushT (section 3) and the solver-adequacy check (section 6) are complete,
+documented, and pushed. Cartpole (section 4) has needed several relaunch
+cycles — a real GL/EGL context leak in `CartpoleDMControlWrapper` was
+found and fixed (commit `bf4e356`), but episode collection is still slow
+under contention from the other concurrently-running jobs; scope was
+cut progressively (512 -> 32 -> 8 episodes) against a hard user deadline.
+The Fetch matrix re-run (section 5) is 5/8 done; `A_fetch_claim` (the
+primary 3-seed claim) is still running.

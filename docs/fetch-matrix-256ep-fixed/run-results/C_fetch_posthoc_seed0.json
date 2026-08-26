@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "encoder": "tiny_cnn",
+    "probe_hidden": 0,
+    "probe_source": "predicted",
+    "detach_probe_input": true,
+    "window": 8,
+    "tactile": true,
+    "epochs": 60,
+    "episodes": 256,
+    "length": 48,
+    "alpha": 1.0,
+    "seed": 0,
+    "batch_size": 32,
+    "conditions": "physwm",
+    "amp": true,
+    "windows": {
+      "train": 10496,
+      "val": 2624
+    }
+  },
+  "results": {
+    "physwm/decodable": {
+      "mass": -0.5609848499298096,
+      "friction": -0.685978889465332
+    },
+    "physwm/own_probe": {
+      "mass": -2.651470899581909,
+      "friction": -2.757572889328003
+    }
+  },
+  "dynamics_results": {
+    "physwm/decodable": {
+      "mass": -0.5609848499298096,
+      "friction": -0.685978889465332
+    },
+    "physwm/own_probe": {
+      "mass": -2.651470899581909,
+      "friction": -2.757572889328003
+    }
+  },
+  "prediction": {
+    "physwm": {
+      "path_a_vs_dataset": 0.4136327718482436,
+      "path_a_query_vs_dataset": 0.4389575605640557,
+      "path_b_vs_teacher": 0.7275803810873168,
+      "path_b_vs_dataset": 0.7504129042074573,
+      "persistence_vs_dataset": 0.6229173301860181,
+      "persistence_query_vs_dataset": 0.6394059932568935
+    }
+  }
+}

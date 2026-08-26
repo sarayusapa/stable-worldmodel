@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "encoder": "tiny_cnn",
+    "probe_hidden": 0,
+    "probe_source": "predicted",
+    "detach_probe_input": false,
+    "window": 8,
+    "tactile": true,
+    "epochs": 60,
+    "episodes": 256,
+    "length": 48,
+    "alpha": 1.0,
+    "seed": 0,
+    "batch_size": 32,
+    "conditions": "state_target",
+    "amp": true,
+    "windows": {
+      "train": 10496,
+      "val": 2624
+    }
+  },
+  "results": {
+    "state_target/decodable": {
+      "mass": -0.268060564994812,
+      "friction": -0.6863738298416138
+    },
+    "state_target/own_probe": {
+      "mass": -2.756387233734131,
+      "friction": -2.7708210945129395
+    }
+  },
+  "dynamics_results": {
+    "state_target/decodable": {
+      "mass": -0.268060564994812,
+      "friction": -0.6863738298416138
+    },
+    "state_target/own_probe": {
+      "mass": -2.756387233734131,
+      "friction": -2.7708210945129395
+    }
+  },
+  "prediction": {
+    "state_target": {
+      "path_a_vs_dataset": 0.4063579881987435,
+      "path_a_query_vs_dataset": 0.4279724991593057,
+      "path_b_vs_teacher": 0.7174103314608067,
+      "path_b_vs_dataset": 0.7489576081492707,
+      "persistence_vs_dataset": 0.6229173301860181,
+      "persistence_query_vs_dataset": 0.6394059932568935
+    }
+  }
+}
