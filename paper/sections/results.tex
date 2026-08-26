@@ -111,32 +111,77 @@ length and data budget.
 Fetch push (MuJoCo), the 2-parameter case
 ($\theta = (\mathrm{mass}, \mathrm{friction})$; Fetch's contact softness
 is a solver parameter, not a material property, so it has no stiffness
-analog to identify). \pathA
-beats persistence cleanly at 256 episodes, but theta recovery is
-currently uninformative: the supervised decodable ceiling is negative
-for both parameters, which points at 256 episodes being below this
-benchmark's own data floor, the same failure mode
-\Cref{sec:results-pokeworld} shows PokeWorld needed 2048 episodes to
-clear. Separately, \textsc{FetchPush} has no analog of PokeWorld's touch
-channel, so per \Cref{tab:touch-certificate}'s logic only the ratio
-friction/mass, not the two raw values, should be identifiable from
-motion alone; the current evaluation code does not yet report that
-ratio for this benchmark. A solver-adequacy check in the style of
-\Cref{tab:solver-adequacy} also surfaced a genuine bug rather than a
-modeling limitation: the frozen solver's gripper term was applying its
-per-transition action displacement once per integration substep instead
-of once per transition, a $10\times$ overshoot with no dependence on
-$\theta$ at all, which confounded every number the 256-episode run
-produced. The fix is a one-line change to the affected term, verified
-at the matrix's own 256-episode scale: the gripper channel is fixed,
+analog to identify). A solver-adequacy check in the style of
+\Cref{tab:solver-adequacy} surfaced a genuine bug rather than a modeling
+limitation before any of the numbers below could be trusted: the frozen
+solver's gripper term was applying its per-transition action
+displacement once per integration substep instead of once per
+transition, a $10\times$ overshoot with no dependence on $\theta$ at
+all. Fixed with a one-line change to the affected term and re-verified
+at the matrix's own 256-episode scale: the gripper channel is clean,
 but the oracle fit still does not beat persistence overall (0.483 vs
 0.411), and correctly beats the true $\theta$ (1.382 against the same
-persistence baseline), which rules out an optimization artifact and
-narrows the residual gap to the solver's functional form, a fixed
-contact stiffness and a point-mass, linear-friction approximation that
-may not suit Fetch as well as it suits \textsc{PokeWorld}. The matrix
-has not yet been re-run against the corrected solver, so we do not
-report Fetch theta-recovery numbers here.
+baseline), which rules out an optimization artifact and narrows the
+residual gap to the solver's functional form, a fixed contact stiffness
+and a point-mass, linear-friction approximation that may not suit Fetch
+as well as it suits \textsc{PokeWorld}. Every number below is from the
+matrix re-run against the corrected solver.
+
+\pathA beats persistence cleanly and consistently, all three seeds,
+both conditions ($0.40$--$0.44$ against $0.62$--$0.69$), the strongest
+this premise has looked on any benchmark so far. Theta recovery is not:
+\Cref{tab:fetch-recovery} is negative everywhere, including the
+supervised decodable ceiling, which points at 256 episodes being below
+this benchmark's own data floor, the same failure mode
+\Cref{sec:results-pokeworld} shows PokeWorld needed 2048 episodes to
+clear. This has nothing to do with the gripper fix: that term has zero
+$\theta$ dependence by construction, so it could never have moved
+theta recovery either way. Separately, \textsc{FetchPush} has no analog
+of PokeWorld's touch channel, so per \Cref{tab:touch-certificate}'s
+logic only the ratio friction/mass, not the two raw values, should be
+identifiable from motion alone; the current evaluation code does not
+yet report that ratio for this benchmark.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lcc}
+\toprule
+Parameter & Predictive ($\alpha{=}0$) & \method \\
+\midrule
+\multicolumn{3}{l}{\textit{decodable (labeled probe, evaluation only)}} \\
+Mass     & $-0.89$ & $-0.64$ \\
+Friction & $-1.14$ & $-0.73$ \\
+\midrule
+\multicolumn{3}{l}{\textit{own\_probe (label-free, no ground truth during training)}} \\
+Mass     & $-2.07$ & $-2.74$ \\
+Friction & $0.00$  & $-2.78$ \\
+\bottomrule
+\end{tabular}
+\caption{Fetch push, val $R^2$, mean over seeds $\{0,1,2\}$, 256
+episodes, 60 epochs, re-run against the corrected solver. Negative
+everywhere, oracle ceiling included, the data-floor pattern
+\Cref{sec:results-pokeworld} shows PokeWorld also needed a larger
+episode budget to clear.}
+\label{tab:fetch-recovery}
+\end{table}
+
+The functional-use anomaly noted before the fix survived it, which is
+itself informative. Substituting the model's own probe $\theta$ into
+the frozen solver produces \emph{lower} one-step error against the real
+next state (scaled RMSE $1.54$) than substituting the actual true
+$\theta$ ($6.98$), at every rollout horizon out to $7$ steps. Since the
+gripper bug is fixed and theta-independent to begin with, it was never
+a sufficient explanation for this on its own. The solver-adequacy
+result above is: the frozen solver does not fit real Fetch dynamics
+well even given the best possible $\theta$, so true $\theta$ run
+through an inadequate solver does not predict well either, while probe
+$\theta$ was trained specifically to make the solver's output match
+\pathA's prediction, which is accurate now that the premise holds. The
+probe can win that comparison by matching what the model already
+believes rather than by being more physically correct, a solver
+limitation worth a caption, the same way \Cref{sec:setup-benchmarks}
+treats Push-T's disc-approximated T-block, not a claim about the
+recipe.
 
 \paragraph{Randomized Push-T.} Standard Push-T has fixed dynamics,
 which makes a shuffled-theta control vacuous (permuting a constant

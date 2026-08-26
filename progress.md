@@ -63,6 +63,110 @@ Copy this block for each new run.
 
 ## Log
 
+### 2026-08-26 — Fetch matrix re-run against the corrected solver, 8/8 complete, logged post hoc
+
+Supersedes the pre-fix "Fetch matrix, 256 episodes, 8 jobs" entry
+further below, which predates the gripper fix (commit `03fa29b`) and
+should not be cited in the paper. Not editing that entry per this
+file's own rule; this one supersedes it and links back.
+
+- **Command:** re-run of the identical 8-job matrix
+  (`A_fetch_claim_seed{0,1,2}`, `B_fetch_preaction_seed0`,
+  `C_fetch_dataset_target_seed0`, `C_fetch_posthoc_seed0`,
+  `H_fetch_vq_seed0`, `F_fetch_functional_seed0`) against
+  `FetchPushSolver` post gripper-fix. Same launcher/config as before;
+  exact per-job command lines not preserved beyond `matrix.log`.
+- **Config:** identical to the pre-fix run — `encoder=tiny_cnn,
+  episodes=256, length=48 (16 for F), window=8, epochs=60, batch=32,
+  tactile=True`.
+- **Seed(s):** 0, 1, 2 for `A_fetch_claim`; seed 0 only for B/C/H/F.
+- **Commit / working tree:** solver fix at `03fa29b`; matrix results
+  added across `0d60c83` (5/8, B/C/C/H/F) and `ca11535` (8/8, adds
+  `A_fetch_claim`).
+- **Hardware:** unknown (not recorded in JSON `meta`).
+- **Data:** `fetch_push`, 256 episodes x 48 steps, same as pre-fix.
+- **Duration:** unknown (not in `matrix.log` for this specific re-run
+  session).
+- **Status:** pass, `rc=0` for all 8 jobs.
+- **Artifacts:** `docs/fetch-matrix-256ep-fixed/run-results/*.json` (8
+  files, committed), `docs/fetch-matrix-256ep-fixed/run-logs/*.log`
+  (also committed this time — see the "track all .log files" note
+  below, a change from the earlier Fetch/PushT convention of keeping
+  raw logs local-only).
+
+**theta recovery — val R² (group A, `predictive` vs `physwm`, 3 seeds)**
+
+| seed | predictive/decodable mass | predictive/decodable friction | predictive/own_probe mass | predictive/own_probe friction | physwm/decodable mass | physwm/decodable friction | physwm/own_probe mass | physwm/own_probe friction |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | -0.7864 | -1.0753 | -2.1136 | -0.0011 | -0.5844 | -0.5101 | -2.7553 | -2.7701 |
+| 1 | -0.8466 | -1.2839 | -2.0476 | -0.0054 | -0.6979 | -0.9898 | -2.7544 | -2.7665 |
+| 2 | -1.0440 | -1.0516 | -2.0562 | -0.0044 | -0.6513 | -0.6997 | -2.7081 | -2.8146 |
+
+**theta recovery — val R² (ablations, seed 0)**
+
+| job | mass (own\_probe) | friction (own\_probe) | mass (decodable) | friction (decodable) |
+| --- | --- | --- | --- | --- |
+| B (pre-action latent) | -2.7488 | -2.7730 | -0.4447 | -0.3305 |
+| C (dataset-target) | -2.7564 | -2.7708 | -0.2681 | -0.6864 |
+| C (posthoc, detached probe) | -2.6515 | -2.7576 | -0.5610 | -0.6860 |
+| H (VQ-theta) | -1.8243 | -1.5629 | -0.1708 | -0.2720 |
+
+**prediction/fidelity RMSE, `predictive` vs `physwm` (group A, 3 seeds)**
+
+| seed | predictive path\_a\_vs\_dataset | physwm path\_a\_vs\_dataset | predictive path\_b\_vs\_teacher | physwm path\_b\_vs\_teacher | persistence\_vs\_dataset |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 0.4200 | 0.4218 | 8.6747 | 0.7288 | 0.6229 |
+| 1 | 0.3987 | 0.4044 | 8.4081 | 0.7338 | 0.6293 |
+| 2 | 0.4386 | 0.4350 | 9.1915 | 0.7938 | 0.6907 |
+
+**functional use (`F_fetch_functional_seed0`), re-checked post-fix**
+
+- Substitution (one-step Path B RMSE vs real `s_next`): true 6.9838,
+  probe 1.5350, shuffled 7.3567, nominal 22.3642.
+- Multi-horizon (H=1..7): probe stays in [1.30, 8.28]; true climbs from
+  10.90 to 22.71. Same ordering as pre-fix, at every horizon.
+- Task success: still 0.03125 for all four sources, still degenerate.
+
+- **Notes:**
+  1. **PREDICT holds cleanly and consistently now.** Path A beats
+     persistence by a healthy, stable margin in all 3 seeds under both
+     conditions (~0.40-0.44 vs ~0.62-0.69). This is the strongest this
+     link has looked across any Fetch run so far.
+  2. **IDENTIFY is still fully negative, exactly as expected.** The
+     gripper term has zero theta dependence by construction (see the
+     "Gripper overshoot fixed" entry below), so it was never going to
+     move theta recovery either way, and it didn't: every job, every
+     seed, `own_probe` R² for mass and friction is still deeply
+     negative (-2.65 to -2.82), including the supervised ceiling
+     (`decodable`), which is also negative everywhere. Unchanged
+     conclusion from pre-fix: 256 episodes is very likely below Fetch's
+     own data floor, mirroring PokeWorld needing 2048.
+  3. **The "probe beats true theta" anomaly survived the fix.**
+     `substitution`'s probe (1.54) still scores far below true theta
+     (6.98) at every horizon, essentially unchanged from the pre-fix
+     numbers (probe 1.48, true 5.55 pre-fix — same ordering, similar
+     magnitude). This rules out the gripper bug as a sufficient
+     explanation on its own (it's fixed now, the anomaly persists).
+     The better explanation, from the matrix-scale solver-adequacy
+     check logged separately in the Open items below: the frozen
+     solver does not beat persistence even at its *best possible* fit
+     (oracle 0.4833 vs persistence 0.4109), so "true" theta run through
+     an inadequate solver doesn't predict well either, while "probe"
+     theta was trained specifically to make the solver's output match
+     Path A's prediction (accurate, since PREDICT holds) — so it can
+     win by matching what the model already believes, not by being
+     more physically correct. This is a solver functional-form
+     limitation (fixed `contact_stiffness=400`, point-mass/
+     linear-friction approximation), not a bug, and not further
+     root-caused past that — treat as a documented limitation/caption
+     in the paper, the same way Push-T's disc-approximation mismatch is
+     handled, rather than more code-hunting.
+  4. Ablations B/C/H show the same fully-negative pattern as group A,
+     no bug-shaped surprises. H (VQ-theta) is consistently the least
+     negative of the four own\_probe values (-1.82/-1.56 vs -2.65 to
+     -2.77 for B/C/C), worth a second look if theta quantization is
+     ever explored as a design axis, but not investigated further here.
+
 ### 2026-08-26 — PushT-randomized (`pusht_rand`) matrix, 512 episodes, 6 jobs, logged post hoc
 
 - **Command:** `matrix.log` records a combined PushT/Cartpole orchestrator
@@ -3388,10 +3492,13 @@ Identifiability certificate (final-epoch val R^2, PokeWorld only):
       8 and 32 episodes (gripper RMSE now matches/beats persistence); not
       yet verified at the 256-episode matrix scale (no GPU on this
       machine).
-- [ ] **Re-run the 256-episode Fetch matrix (A/B/C/H/F)** now that the
-      gripper fix is in — every Fetch number in the 2026-08-26 "Fetch
-      matrix" entry above predates the fix and should not be cited in the
-      paper as-is.
+- [x] **Re-run the 256-episode Fetch matrix (A/B/C/H/F)** — done
+      2026-08-26, all 8/8 jobs, see the "Fetch matrix re-run against the
+      corrected solver" entry near the top of the log. PREDICT holds
+      cleanly across all 3 seeds; IDENTIFY is still fully negative
+      (expected, unrelated to the gripper fix); the "probe beats true
+      theta" anomaly survived the fix and is now attributed to the
+      solver-adequacy gap instead.
 - [x] **Root-cause the residual Fetch solver-adequacy gap** — checked at
       real matrix scale 2026-08-26 (`validate_solvers.py --benchmarks
       fetch_push --episodes 256 --length 48 --steps 1200`, GPU pod):
