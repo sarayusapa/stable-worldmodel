@@ -4,7 +4,7 @@
     "physics_target": "path_a",
     "encoder": "tiny_cnn",
     "epochs": 40,
-    "episodes": 32,
+    "episodes": 64,
     "length": 48,
     "window": 8,
     "seed": 2,
@@ -17,36 +17,36 @@
       "cart_damping"
     ],
     "windows": {
-      "train": 1312,
-      "val": 328
+      "train": 2624,
+      "val": 656
     }
   },
   "substitution": {
-    "probe": 0.08704843372106552,
-    "shuffled": 0.12846483290195465,
-    "nominal": 0.00882056262344122
+    "probe": 0.4412309527397156,
+    "shuffled": 0.43909600377082825,
+    "nominal": 0.007508612237870693
   },
   "beats_nominal": false,
-  "beats_shuffled": true,
-  "shuffled_minus_probe": 0.04141639918088913,
+  "beats_shuffled": false,
+  "shuffled_minus_probe": -0.002134948968887329,
   "sensitivity": {
-    "cart_mass": 0.024110913276672363,
-    "pole_mass": 0.00046511803520843387,
-    "pole_half_length": 0.020762506872415543,
-    "gravity": 0.0015615655574947596,
-    "force_gain": 0.02505337819457054,
-    "cart_damping": 0.010402322746813297
+    "cart_mass": 0.05971158668398857,
+    "pole_mass": 0.0018717023776844144,
+    "pole_half_length": 0.02990742027759552,
+    "gravity": 0.0003614285960793495,
+    "force_gain": 0.04163582995533943,
+    "cart_damping": 0.05598749965429306
   },
   "theta_spread": {
-    "cart_mass": 0.11055716872215271,
-    "pole_mass": 0.008864345028996468,
-    "pole_half_length": 0.009589617140591145,
-    "gravity": 0.8913053274154663,
-    "force_gain": 1.016584038734436,
-    "cart_damping": 1.0675976276397705
+    "cart_mass": 0.09029179811477661,
+    "pole_mass": 0.0074120573699474335,
+    "pole_half_length": 0.053437739610672,
+    "gravity": 0.7531635761260986,
+    "force_gain": 0.558649480342865,
+    "cart_damping": 0.5184277296066284
   },
   "prediction": {
-    "path_a": 0.2673609329033801,
-    "persistence": 0.18860704115848914
+    "path_a": 0.8517534876620549,
+    "persistence": 0.17755603303333936
   }
 }

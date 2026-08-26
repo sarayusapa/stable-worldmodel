@@ -136,7 +136,7 @@ this repo's `*.log` convention).
 
 ---
 
-## 4. Cartpole — 32 episodes, run by me, complete (small-N, scaling up as contention allows)
+## 4. Cartpole — 8/32/64 episode progression, run by me, complete (small-N throughout)
 
 **Benchmark:** DMControl Cartpole (MuJoCo via `dm_control`, a different
 binding path than Fetch's `gymnasium_robotics`). **No ground truth
@@ -172,10 +172,13 @@ inconsistency later.
 GPU/EGL contention eased once the Fetch matrix and PushT jobs finished.
 Each cut was forced by a real GL/EGL context-contention bottleneck in
 episode collection, not model instability — see the real bug found and
-fixed below. **This entry covers the 32-episode run (40 epochs, 1312
-train / 328 val windows) — still small-N, but a real step up from the
-8-episode sanity check; a 64-episode run is in progress as a further
-scale-up, see Status section.** All 3 seeds completed (rc=0).
+fixed below. **Three complete runs exist: 8, 32, and 64 episodes, all 3
+seeds each, all rc=0.** Important caveat that applies to all three:
+episodes are **not cached or shared across runs** — each is a fresh,
+independent random draw, not the same seed's data extended with more
+samples. So "seed 0 at 32ep" and "seed 0 at 64ep" are different episode
+sets, not a growing one; per-seed numbers are not directly comparable
+across runs the way a real scaling-law sweep would need.
 
 **Second real bug found and fixed, independent of the length/abort bug
 above:** `CartpoleDMControlWrapper.compile_model()`
@@ -192,23 +195,34 @@ so any remaining native abort only costs a retried batch, never the
 whole job — this is what let the length go back to the real 48 (matching
 PushT) instead of staying at the workaround value of 32.
 
-**Result (32 episodes — still small-N, but improving with scale):**
-`probe` now beats `shuffled` in **all 3 seeds** (gap 0.012-0.045, up from
-2/3 seeds and a razor-thin 0.0007-0.008 gap at 8 episodes) — a real,
-consistent improvement. `probe` still does not beat `nominal` in any seed
-(nominal RMSE 0.007-0.009 vs. probe 0.085-0.087 — the fixed default
-theta still predicts far better than per-episode inference at this
-scale). `path_a` is still worse than persistence in all 3 seeds, but the
-gap narrowed sharply for 2 of them (seed0: 0.389 vs. 0.189, was 1.098 vs.
-0.200 at 8ep; seed2: 0.267 vs. 0.189, was 0.818 vs. 0.201 at 8ep; seed1
-is the outlier, 1.089 vs. 0.243, barely improved). This trend — closing
-the persistence gap as episode count grows — is exactly what a
-data-starved model recovering with more data should look like, not
-evidence cartpole is unlearnable; it just hasn't crossed the floor yet.
-**Re-running at a real episode count (512, or whatever the datafloor
-sweep pattern from PokeWorld suggests) is still the real open item** —
-the 64-episode run in progress is another step in that direction, not
-the final answer.
+**Result across all three runs (honest read — no clean trend, results are
+noisy at this scale):**
+
+| episodes | probe beats shuffled | mean path_a | mean persistence |
+| --- | --- | --- | --- |
+| 8 | 2/3 seeds (gap 0.0007-0.008) | 0.896 | 0.192 |
+| 32 | 3/3 seeds (gap 0.012-0.045) | 0.582 | 0.207 |
+| 64 | 2/3 seeds (gap -0.002-0.086) | 0.792 | 0.199 |
+
+`probe` never beats `nominal` at any scale (nominal RMSE stays ~0.007-0.01
+throughout — the fixed default theta consistently predicts far better
+than any per-episode inference here). `path_a` never beats persistence at
+any scale either, and **the mean path_a error is not monotonic in episode
+count** (0.896 -> 0.582 -> 0.792) — 32 episodes did best, 64 regressed.
+Given the no-caching caveat above, this is most likely just draw-to-draw
+variance from small, independent samples, not a real non-monotonic
+relationship with data — but that itself is the finding: **8-64 episodes
+is nowhere near enough to see a clean signal for cartpole, and it would
+be dishonest to report a smooth "improving with scale" story that isn't
+actually there in the numbers.** `probe`-beats-`shuffled` is the one
+consistently positive result (majority of seeds at every scale), meaning
+theta carries *some* real per-episode information even this early — just
+not enough yet to make Path A or Path B competitive.
+
+**Re-running at a real episode count (512, matching the original plan,
+or whatever the datafloor sweep pattern from PokeWorld suggests) is the
+actual open item** — none of 8/32/64 should be read as more than a
+pipeline-correctness check.
 
 **Result dir:** `docs/cartpole-matrix/run-results/*.json` (3 files,
 committed), `docs/cartpole-matrix/run-logs/*.log` (local-only, per this

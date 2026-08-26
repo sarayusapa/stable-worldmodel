@@ -75,3 +75,10 @@
 [06:22:29] DONE cartpole_xbench_seed2 rc=0 dur=936s
 [06:22:45] DONE cartpole_xbench_seed0 rc=0 dur=952s
 [06:23:09] DONE cartpole_xbench_seed1 rc=0 dur=976s
+[06:25:58] RETRY10 cartpole_xbench_seed0/1/2 -- 32ep run finished cleanly, bumping to episodes=64 while contention stays low. batch_size for episode collection bumped 1->12 (timeout 400s) to cut subprocess overhead now that the GL/EGL leak fix means larger batches are safe again.
+[06:25:58] START cartpole_xbench_seed0 (episodes=64, length=48)
+[06:25:58] START cartpole_xbench_seed1 (episodes=64, length=48)
+[06:25:58] START cartpole_xbench_seed2 (episodes=64, length=48)
+[06:44:14] DONE cartpole_xbench_seed2 rc=0 dur=1096s
+[06:45:34] DONE cartpole_xbench_seed0 rc=0 dur=1176s
+[06:48:29] DONE cartpole_xbench_seed1 rc=0 dur=1351s
