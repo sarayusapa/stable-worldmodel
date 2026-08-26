@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "encoder": "tiny_cnn",
+    "probe_hidden": 0,
+    "probe_source": "predicted",
+    "detach_probe_input": false,
+    "window": 8,
+    "tactile": true,
+    "epochs": 60,
+    "episodes": 256,
+    "length": 48,
+    "alpha": 1.0,
+    "seed": 1,
+    "batch_size": 32,
+    "conditions": "predictive,physwm",
+    "amp": true,
+    "windows": {
+      "train": 10496,
+      "val": 2624
+    }
+  },
+  "results": {
+    "predictive/decodable": {
+      "mass": -0.6688498258590698,
+      "friction": -0.7249958515167236
+    },
+    "predictive/own_probe": {
+      "mass": -2.0463035106658936,
+      "friction": -0.006322622299194336
+    },
+    "physwm/decodable": {
+      "mass": -0.34232914447784424,
+      "friction": -0.4621756076812744
+    },
+    "physwm/own_probe": {
+      "mass": -2.7532858848571777,
+      "friction": -2.764738082885742
+    }
+  },
+  "dynamics_results": {
+    "predictive/decodable": {
+      "mass": -0.6688498258590698,
+      "friction": -0.7249958515167236
+    },
+    "predictive/own_probe": {
+      "mass": -2.0463035106658936,
+      "friction": -0.006322622299194336
+    },
+    "physwm/decodable": {
+      "mass": -0.34232914447784424,
+      "friction": -0.4621756076812744
+    },
+    "physwm/own_probe": {
+      "mass": -2.7532858848571777,
+      "friction": -2.764738082885742
+    }
+  },
+  "prediction": {
+    "predictive": {
+      "path_a_vs_dataset": 0.3983573925673389,
+      "path_a_query_vs_dataset": 0.42822999610771667,
+      "path_b_vs_teacher": 8.664743392563311,
+      "path_b_vs_dataset": 8.6545348146151,
+      "persistence_vs_dataset": 0.6293450274442225,
+      "persistence_query_vs_dataset": 0.6561608467790929
+    },
+    "physwm": {
+      "path_a_vs_dataset": 0.4001760045192411,
+      "path_a_query_vs_dataset": 0.42739868660991914,
+      "path_b_vs_teacher": 0.7686611719194713,
+      "path_b_vs_dataset": 0.8110972102532852,
+      "persistence_vs_dataset": 0.6293450274442225,
+      "persistence_query_vs_dataset": 0.6561608467790929
+    }
+  }
+}
