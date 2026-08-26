@@ -222,17 +222,40 @@ def run_one(exp, results_dir, timeout, threads=2):
         'OPENBLAS_NUM_THREADS': str(threads),
     }
     start = time.time()
-    try:
-        proc = subprocess.run(
-            cmd, cwd=ROOT, env=env, capture_output=True, text=True,
-            timeout=timeout, check=False,
-        )
-        ok, out = proc.returncode == 0, proc.stdout + proc.stderr
-    except subprocess.TimeoutExpired as e:
-        ok = False
-        out = (e.stdout or '') + (e.stderr or '') + f'\nTIMEOUT after {timeout}s'
+    # Streamed incrementally to disk (not captured in memory and written
+    # once at the end): if this process or its parent gets killed --
+    # exactly what happened to a prior overnight run, where three ~137min
+    # jobs died mid-flight and left 0-byte logs with no way to diagnose
+    # what had actually run -- whatever was written before the kill is
+    # still on disk. `-u` on the child (already set via cmd[1]) makes it
+    # unbuffered on its end; opening in line-buffered text mode here plus
+    # an explicit flush after every read is what keeps our side current
+    # too.
+    ok = False
+    timed_out = False
+    with open(log_path, 'w', buffering=1) as log_file:
+        try:
+            proc = subprocess.Popen(
+                cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, text=True, bufsize=1,
+            )
+            deadline = start + timeout
+            for line in proc.stdout:
+                log_file.write(line)
+                log_file.flush()
+                if time.time() > deadline:
+                    timed_out = True
+                    proc.kill()
+                    break
+            proc.wait(timeout=30)
+            ok = (proc.returncode == 0) and not timed_out
+            if timed_out:
+                log_file.write(f'\nTIMEOUT after {timeout}s\n')
+                log_file.flush()
+        except Exception as e:
+            log_file.write(f'\nrun_one() itself raised: {e!r}\n')
+            log_file.flush()
     dt = time.time() - start
-    log_path.write_text(out)
     return {
         'exp': exp, 'ok': ok, 'seconds': dt, 'cmd': ' '.join(cmd),
         'json': out_json if out_json.exists() else None,
