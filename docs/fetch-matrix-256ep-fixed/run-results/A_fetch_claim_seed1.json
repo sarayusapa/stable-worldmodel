@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "encoder": "tiny_cnn",
+    "probe_hidden": 0,
+    "probe_source": "predicted",
+    "detach_probe_input": false,
+    "window": 8,
+    "tactile": true,
+    "epochs": 60,
+    "episodes": 256,
+    "length": 48,
+    "alpha": 1.0,
+    "seed": 1,
+    "batch_size": 32,
+    "conditions": "predictive,physwm",
+    "amp": true,
+    "windows": {
+      "train": 10496,
+      "val": 2624
+    }
+  },
+  "results": {
+    "predictive/decodable": {
+      "mass": -0.8466383218765259,
+      "friction": -1.2839391231536865
+    },
+    "predictive/own_probe": {
+      "mass": -2.0475592613220215,
+      "friction": -0.0053910017013549805
+    },
+    "physwm/decodable": {
+      "mass": -0.69788658618927,
+      "friction": -0.9897686243057251
+    },
+    "physwm/own_probe": {
+      "mass": -2.754427194595337,
+      "friction": -2.7664530277252197
+    }
+  },
+  "dynamics_results": {
+    "predictive/decodable": {
+      "mass": -0.8466383218765259,
+      "friction": -1.2839391231536865
+    },
+    "predictive/own_probe": {
+      "mass": -2.0475592613220215,
+      "friction": -0.0053910017013549805
+    },
+    "physwm/decodable": {
+      "mass": -0.69788658618927,
+      "friction": -0.9897686243057251
+    },
+    "physwm/own_probe": {
+      "mass": -2.754427194595337,
+      "friction": -2.7664530277252197
+    }
+  },
+  "prediction": {
+    "predictive": {
+      "path_a_vs_dataset": 0.3986996865197084,
+      "path_a_query_vs_dataset": 0.4292868802090949,
+      "path_b_vs_teacher": 8.408090539031662,
+      "path_b_vs_dataset": 8.37812402271091,
+      "persistence_vs_dataset": 0.6293450274442225,
+      "persistence_query_vs_dataset": 0.6561608467790929
+    },
+    "physwm": {
+      "path_a_vs_dataset": 0.4043963688941355,
+      "path_a_query_vs_dataset": 0.43203457924277333,
+      "path_b_vs_teacher": 0.7338275524089973,
+      "path_b_vs_dataset": 0.7633078994731437,
+      "persistence_vs_dataset": 0.6293450274442225,
+      "persistence_query_vs_dataset": 0.6561608467790929
+    }
+  }
+}

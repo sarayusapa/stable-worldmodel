@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "encoder": "tiny_cnn",
+    "probe_hidden": 0,
+    "probe_source": "predicted",
+    "detach_probe_input": false,
+    "window": 8,
+    "tactile": true,
+    "epochs": 60,
+    "episodes": 256,
+    "length": 48,
+    "alpha": 1.0,
+    "seed": 0,
+    "batch_size": 32,
+    "conditions": "predictive,physwm",
+    "amp": true,
+    "windows": {
+      "train": 10496,
+      "val": 2624
+    }
+  },
+  "results": {
+    "predictive/decodable": {
+      "mass": -0.7863572835922241,
+      "friction": -1.0752770900726318
+    },
+    "predictive/own_probe": {
+      "mass": -2.11356258392334,
+      "friction": -0.0010879039764404297
+    },
+    "physwm/decodable": {
+      "mass": -0.5844374895095825,
+      "friction": -0.5100517272949219
+    },
+    "physwm/own_probe": {
+      "mass": -2.7552876472473145,
+      "friction": -2.770108461380005
+    }
+  },
+  "dynamics_results": {
+    "predictive/decodable": {
+      "mass": -0.7863572835922241,
+      "friction": -1.0752770900726318
+    },
+    "predictive/own_probe": {
+      "mass": -2.11356258392334,
+      "friction": -0.0010879039764404297
+    },
+    "physwm/decodable": {
+      "mass": -0.5844374895095825,
+      "friction": -0.5100517272949219
+    },
+    "physwm/own_probe": {
+      "mass": -2.7552876472473145,
+      "friction": -2.770108461380005
+    }
+  },
+  "prediction": {
+    "predictive": {
+      "path_a_vs_dataset": 0.42003675841375177,
+      "path_a_query_vs_dataset": 0.44362946064858705,
+      "path_b_vs_teacher": 8.674684749498839,
+      "path_b_vs_dataset": 8.641416691616662,
+      "persistence_vs_dataset": 0.6229173301860181,
+      "persistence_query_vs_dataset": 0.6394059932568935
+    },
+    "physwm": {
+      "path_a_vs_dataset": 0.4218391053235438,
+      "path_a_query_vs_dataset": 0.44841904502580815,
+      "path_b_vs_teacher": 0.7288009443032589,
+      "path_b_vs_dataset": 0.7489838112490866,
+      "persistence_vs_dataset": 0.6229173301860181,
+      "persistence_query_vs_dataset": 0.6394059932568935
+    }
+  }
+}

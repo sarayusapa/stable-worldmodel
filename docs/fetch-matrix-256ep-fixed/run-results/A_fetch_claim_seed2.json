@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "encoder": "tiny_cnn",
+    "probe_hidden": 0,
+    "probe_source": "predicted",
+    "detach_probe_input": false,
+    "window": 8,
+    "tactile": true,
+    "epochs": 60,
+    "episodes": 256,
+    "length": 48,
+    "alpha": 1.0,
+    "seed": 2,
+    "batch_size": 32,
+    "conditions": "predictive,physwm",
+    "amp": true,
+    "windows": {
+      "train": 10496,
+      "val": 2624
+    }
+  },
+  "results": {
+    "predictive/decodable": {
+      "mass": -1.0440123081207275,
+      "friction": -1.0515873432159424
+    },
+    "predictive/own_probe": {
+      "mass": -2.0561914443969727,
+      "friction": -0.004403352737426758
+    },
+    "physwm/decodable": {
+      "mass": -0.6512746810913086,
+      "friction": -0.6996562480926514
+    },
+    "physwm/own_probe": {
+      "mass": -2.708122491836548,
+      "friction": -2.81455135345459
+    }
+  },
+  "dynamics_results": {
+    "predictive/decodable": {
+      "mass": -1.0440123081207275,
+      "friction": -1.0515873432159424
+    },
+    "predictive/own_probe": {
+      "mass": -2.0561914443969727,
+      "friction": -0.004403352737426758
+    },
+    "physwm/decodable": {
+      "mass": -0.6512746810913086,
+      "friction": -0.6996562480926514
+    },
+    "physwm/own_probe": {
+      "mass": -2.708122491836548,
+      "friction": -2.81455135345459
+    }
+  },
+  "prediction": {
+    "predictive": {
+      "path_a_vs_dataset": 0.4385941402265908,
+      "path_a_query_vs_dataset": 0.4598275941193328,
+      "path_b_vs_teacher": 9.191480754095751,
+      "path_b_vs_dataset": 9.154142601937263,
+      "persistence_vs_dataset": 0.6907180187013858,
+      "persistence_query_vs_dataset": 0.7068092970090999
+    },
+    "physwm": {
+      "path_a_vs_dataset": 0.4349823149571526,
+      "path_a_query_vs_dataset": 0.4534821542723639,
+      "path_b_vs_teacher": 0.7938241326068547,
+      "path_b_vs_dataset": 0.8240406173767126,
+      "persistence_vs_dataset": 0.6907180187013858,
+      "persistence_query_vs_dataset": 0.7068092970090999
+    }
+  }
+}

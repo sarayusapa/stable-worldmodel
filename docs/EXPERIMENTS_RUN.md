@@ -213,17 +213,49 @@ repo's `*.log` convention).
 
 ---
 
-## 5. Fetch matrix re-run — 256 episodes, gripper fix applied, 5/8 complete
+## 5. Fetch matrix re-run — 256 episodes, gripper fix applied, complete (8/8)
 
 Re-run of section 2's matrix against the corrected `FetchPushSolver`
 (commit `03fa29b` — the gripper's action-scale term was applied once per
 substep instead of once per transition, a 10x overshoot with zero theta
 dependence). Same config as the original: `tiny_cnn` encoder, 256
-episodes, length 48, window 8 (16 for F), 60 epochs, batch 32.
+episodes, length 48, window 8 (16 for F), 60 epochs, batch 32. All 8 jobs
+finished (rc=0).
 
-**Done (rc=0):** `B_fetch_preaction_seed0`, `C_fetch_dataset_target_seed0`,
-`C_fetch_posthoc_seed0`, `H_fetch_vq_seed0`, `F_fetch_functional_seed0`.
-**Still running:** `A_fetch_claim_seed{0,1,2}` (the primary claim, 3 seeds).
+**theta recovery — val R² (`A_fetch_claim`, `predictive` vs `physwm`, 3 seeds)**
+
+| seed | predictive/decodable mass | predictive/decodable friction | predictive/own_probe mass | predictive/own_probe friction | physwm/decodable mass | physwm/decodable friction | physwm/own_probe mass | physwm/own_probe friction |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | -0.786 | -1.075 | -2.114 | -0.001 | -0.584 | -0.510 | -2.755 | -2.770 |
+| 1 | -0.847 | -1.284 | -2.048 | -0.005 | -0.698 | -0.990 | -2.754 | -2.766 |
+| 2 | -1.044 | -1.052 | -2.056 | -0.004 | -0.651 | -0.700 | -2.708 | -2.815 |
+
+Still negative across the board for both conditions and both readout
+methods, including the supervised ceiling (`decodable`) — the gripper fix
+was never expected to move this (the gripper term has zero theta
+dependence by construction), and this matches the pre-fix finding: 256
+episodes is very likely below Fetch's own data floor, mirroring PokeWorld
+needing 512-2048 before its own ceiling turned positive.
+
+**prediction/fidelity, `predictive` vs `physwm` (3-seed range)**
+
+| metric | predictive | physwm |
+| --- | --- | --- |
+| path_a_vs_dataset | 0.399-0.439 | 0.404-0.435 |
+| path_b_vs_teacher | 8.41-9.19 | 0.73-0.79 |
+| persistence_vs_dataset | 0.623-0.691 | 0.623-0.691 |
+
+**PREDICT holds cleanly and consistently**: Path A beats persistence by a
+healthy, stable margin in all 3 seeds under both conditions
+(~0.40-0.44 vs. ~0.62-0.69). `predictive`'s Path B is essentially
+unconstrained (no physics-grounding loss trains it against real
+transitions), hence its huge `path_b_vs_teacher` gap versus `physwm`'s —
+expected, not a regression.
+
+The B/C/H/F ablation results and the persistent "probe beats true theta"
+anomaly (unaffected by the gripper fix, better explained by the solver-
+adequacy gap in section 6) are unchanged from the summary already
+written below.
 
 **theta recovery — val R² (seed 0, `own_probe`/`decodable`)**
 
