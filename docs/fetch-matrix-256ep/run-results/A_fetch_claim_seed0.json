@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "encoder": "tiny_cnn",
+    "probe_hidden": 0,
+    "probe_source": "predicted",
+    "detach_probe_input": false,
+    "window": 8,
+    "tactile": true,
+    "epochs": 60,
+    "episodes": 256,
+    "length": 48,
+    "alpha": 1.0,
+    "seed": 0,
+    "batch_size": 32,
+    "conditions": "predictive,physwm",
+    "amp": true,
+    "windows": {
+      "train": 10496,
+      "val": 2624
+    }
+  },
+  "results": {
+    "predictive/decodable": {
+      "mass": -0.8154075145721436,
+      "friction": -0.2690020799636841
+    },
+    "predictive/own_probe": {
+      "mass": -2.1129934787750244,
+      "friction": 0.0005249977111816406
+    },
+    "physwm/decodable": {
+      "mass": -0.7063878774642944,
+      "friction": -0.45022261142730713
+    },
+    "physwm/own_probe": {
+      "mass": -2.7537355422973633,
+      "friction": -2.767940044403076
+    }
+  },
+  "dynamics_results": {
+    "predictive/decodable": {
+      "mass": -0.8154075145721436,
+      "friction": -0.2690020799636841
+    },
+    "predictive/own_probe": {
+      "mass": -2.1129934787750244,
+      "friction": 0.0005249977111816406
+    },
+    "physwm/decodable": {
+      "mass": -0.7063878774642944,
+      "friction": -0.45022261142730713
+    },
+    "physwm/own_probe": {
+      "mass": -2.7537355422973633,
+      "friction": -2.767940044403076
+    }
+  },
+  "prediction": {
+    "predictive": {
+      "path_a_vs_dataset": 0.42032924908096597,
+      "path_a_query_vs_dataset": 0.44464285204864124,
+      "path_b_vs_teacher": 8.989819257632318,
+      "path_b_vs_dataset": 8.978945563621766,
+      "persistence_vs_dataset": 0.6229173301860181,
+      "persistence_query_vs_dataset": 0.6394059932568935
+    },
+    "physwm": {
+      "path_a_vs_dataset": 0.4212861036729572,
+      "path_a_query_vs_dataset": 0.4467896872974174,
+      "path_b_vs_teacher": 0.7708593823887461,
+      "path_b_vs_dataset": 0.7972310288110351,
+      "persistence_vs_dataset": 0.6229173301860181,
+      "persistence_query_vs_dataset": 0.6394059932568935
+    }
+  }
+}

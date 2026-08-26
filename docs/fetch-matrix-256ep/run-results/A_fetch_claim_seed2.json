@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "encoder": "tiny_cnn",
+    "probe_hidden": 0,
+    "probe_source": "predicted",
+    "detach_probe_input": false,
+    "window": 8,
+    "tactile": true,
+    "epochs": 60,
+    "episodes": 256,
+    "length": 48,
+    "alpha": 1.0,
+    "seed": 2,
+    "batch_size": 32,
+    "conditions": "predictive,physwm",
+    "amp": true,
+    "windows": {
+      "train": 10496,
+      "val": 2624
+    }
+  },
+  "results": {
+    "predictive/decodable": {
+      "mass": -0.3466167449951172,
+      "friction": -1.1507642269134521
+    },
+    "predictive/own_probe": {
+      "mass": -2.0582356452941895,
+      "friction": -0.003087639808654785
+    },
+    "physwm/decodable": {
+      "mass": -0.31035053730010986,
+      "friction": -0.37382256984710693
+    },
+    "physwm/own_probe": {
+      "mass": -2.707094669342041,
+      "friction": -2.8135199546813965
+    }
+  },
+  "dynamics_results": {
+    "predictive/decodable": {
+      "mass": -0.3466167449951172,
+      "friction": -1.1507642269134521
+    },
+    "predictive/own_probe": {
+      "mass": -2.0582356452941895,
+      "friction": -0.003087639808654785
+    },
+    "physwm/decodable": {
+      "mass": -0.31035053730010986,
+      "friction": -0.37382256984710693
+    },
+    "physwm/own_probe": {
+      "mass": -2.707094669342041,
+      "friction": -2.8135199546813965
+    }
+  },
+  "prediction": {
+    "predictive": {
+      "path_a_vs_dataset": 0.4468197820530833,
+      "path_a_query_vs_dataset": 0.46831586294216204,
+      "path_b_vs_teacher": 9.654823279656602,
+      "path_b_vs_dataset": 9.648284712612233,
+      "persistence_vs_dataset": 0.6907180187013858,
+      "persistence_query_vs_dataset": 0.7068092970090999
+    },
+    "physwm": {
+      "path_a_vs_dataset": 0.4529383038060438,
+      "path_a_query_vs_dataset": 0.47782879945332873,
+      "path_b_vs_teacher": 0.8342897147179045,
+      "path_b_vs_dataset": 0.8662009145654175,
+      "persistence_vs_dataset": 0.6907180187013858,
+      "persistence_query_vs_dataset": 0.7068092970090999
+    }
+  }
+}
