@@ -1,0 +1,23 @@
+/workspace/stable-worldmodel/.venv/lib/python3.10/site-packages/gymnasium/spaces/box.py:415: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  gym.logger.warn("Casting input x to numpy array.")
+
+pusht_rand / target=path_a / seed=1
+  windows: train=20992 val=5248
+  Path A 0.4751 vs persistence 0.6214
+  substitution (scaled RMSE vs observed s_next, lower better):
+    probe      0.21281
+    nominal    0.23946
+    shuffled   0.27293
+  probe beats nominal: True   beats shuffled: True
+  sensitivity:
+    agent_kp           0.03983   (theta sd 20.11)
+    agent_kv           0.03526   (theta sd 3.032)
+    agent_radius       0.00165   (theta sd 4.639)
+    block_radius       0.00385   (theta sd 11.01)
+    contact_stiffness  0.00246   (theta sd 1.545)
+    mobility_lin       0.00174   (theta sd 0.193)
+    mobility_ang       0.00175   (theta sd 6.399e-05)
+    com_offset_x       0.00293   (theta sd 3.431)
+    com_offset_y       0.00302   (theta sd 11.7)
+
+wrote /workspace/physwm-artifacts/runs/pusht-cartpole-matrix/pusht_rand_xbench_seed1.json

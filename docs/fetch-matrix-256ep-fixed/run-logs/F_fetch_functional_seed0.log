@@ -1,0 +1,39 @@
+
+Functional use of theta -- PokeWorld, 256 episodes x 48, 60 epochs, seed 0
+
+1. SENSITIVITY: prediction shift from scaling theta by 1.1x
+   (near zero => the solver ignores that component; recovering it is meaningless)
+   mass         0.04671
+   friction     0.00013
+
+2. SUBSTITUTION: one-step Path B error vs true s_next (scaled RMSE, lower better)
+   true         6.98376
+   probe        1.53504
+   nominal     22.36425
+   shuffled     7.35673
+
+   shuffled-minus-true gap :    0.37296   (how much episode-specific theta is worth at all)
+   probe closes            :    1560.9% of it
+
+3. MULTI-HORIZON rollout error (scaled RMSE, horizon 1..7)
+   source           1        2        3        4        5        6        7
+   true       10.8982  13.7034  16.3778  18.5833  20.4096  21.7392  22.7146
+   probe       1.2984   2.3988   3.7982   5.1489   6.3534   7.3798   8.2800
+   nominal    22.4341  31.4615  35.2789  36.8507  37.3945  37.4825  37.2346
+   shuffled    9.1678  13.4703  16.7601  19.0765  20.7016  21.8770  22.7187
+
+   a probe curve tracking `true` and separating from `shuffled` as the
+   horizon grows is the evidence that theta is functionally used.
+
+4. TASK SUCCESS: fraction of episodes reaching the goal in a 7-step solver rollout (threshold 0.05)
+   true            3.1%
+   probe           3.1%
+   nominal         3.1%
+   shuffled        3.1%
+
+   this scores the SAME true/probe/shuffled/nominal comparison as (2)/(3) by task outcome
+   instead of prediction error -- a probe rate near `true` and clearly above `shuffled`
+   means the recovered physics is worth something for the actual task, not just accurate
+   in an RMSE sense.
+
+wrote /workspace/physwm-artifacts/runs/fetch-matrix-256ep-fixed/F_fetch_functional_seed0.json

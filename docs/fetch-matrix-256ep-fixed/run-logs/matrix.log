@@ -1,0 +1,18 @@
+=== Fetch matrix RE-RUN (gripper-overshoot fix) starting at Wed Aug 26 04:56:15 UTC 2026 ===
+Re-running the 256ep A/B/C/H/F matrix against the corrected FetchPushSolver
+(commit 03fa29b: gripper displacement was being applied once per substep
+instead of once per transition, a 10x overshoot with zero theta dependence).
+Original (pre-fix) results kept at docs/fetch-matrix-256ep/ for the record.
+[04:56:15] START A_fetch_claim_seed0
+[04:56:15] START A_fetch_claim_seed1
+[04:56:15] START A_fetch_claim_seed2
+[04:56:15] START B_fetch_preaction_seed0
+[04:56:15] START C_fetch_dataset_target_seed0
+[04:56:15] START C_fetch_posthoc_seed0
+[04:56:15] START H_fetch_vq_seed0
+[04:56:15] START F_fetch_functional_seed0
+[05:46:14] DONE F_fetch_functional_seed0 rc=0 dur=2999s
+[05:51:04] DONE H_fetch_vq_seed0 rc=0 dur=3289s
+[05:51:32] DONE C_fetch_dataset_target_seed0 rc=0 dur=3317s
+[05:51:35] DONE B_fetch_preaction_seed0 rc=0 dur=3320s
+[05:51:54] DONE C_fetch_posthoc_seed0 rc=0 dur=3339s

@@ -1,0 +1,32 @@
+
+PokeWorld theta recovery -- val R^2 (256 episodes x 48, 60 epochs, seed 0, encoder tiny_cnn, probe source predicted, probe_hidden 0)
+
+  windows after observability filter: 10496 train / 2624 val
+  decodable = supervised ridge read-out on the FROZEN latent
+              (upper bound: is the physics encoded at all?)
+  own probe = the model's unsupervised probe through the solver
+
+param          physwm/decodable      physwm/own_probe
+mass                    -0.5610               -2.6515
+friction                -0.6860               -2.7576
+
+Dynamics-coordinate recovery -- val R^2
+coordinate      physwm/decodable      physwm/own_probe
+mass                    -0.5610               -2.6515
+friction                -0.6860               -2.7576
+
+Prediction/fidelity RMSE on the SAME held-out checkpoints
+metric                                physwm
+path_a_vs_dataset                     0.4136
+path_a_query_vs_dataset               0.4390
+path_b_vs_teacher                     0.7276
+path_b_vs_dataset                     0.7504
+persistence_vs_dataset                0.6229
+persistence_query_vs_dataset          0.6394
+
+reading it: if `predictive/decodable` is near zero the predictive
+objective never encoded that parameter -- which is the claim. If it is
+high but `predictive/own_probe` is low, the physics was already there
+and only the read-out was missing.
+
+wrote /workspace/physwm-artifacts/runs/fetch-matrix-256ep-fixed/C_fetch_posthoc_seed0.json

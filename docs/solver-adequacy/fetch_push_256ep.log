@@ -1,0 +1,22 @@
+AdroitHandRelocateDense-v1, AdroitHandHammerDense-v1, AdroitHandDoorDense-v1 environment's reward functions were updated in v1.2.1 without an environment version update. Therefore, use gymnasium-robotics==1.2.0 for v1 reproducibility or use v2 in gymnasium-robotics>=1.4.3. See https://github.com/Farama-Foundation/Gymnasium-Robotics/pull/220 for more details
+
+=== fetch_push ===
+transitions: 12032   state dims: ['gripper_x', 'gripper_y', 'object_x', 'object_y', 'object_vx', 'object_vy']
+dim           persist    nominal       true     fitted
+gripper_x      0.0470     0.0456     0.0456     0.0456
+gripper_y      0.0501     0.0307     0.0307     0.0307
+object_x       0.0372     0.0337     0.0343     0.0349
+object_y       0.0345     0.0258     0.0312     0.0325
+object_vx      1.1739    12.1225     3.9109     1.3807
+object_vy      1.1224    13.0927     4.2411     1.3754
+MEAN           0.4109     4.2252     1.3823     0.4833
+fitted theta (episode 0):
+  mass                     39.16395
+  friction                  1.73682
+true theta (episode 0):
+  mass                     30.26607
+  friction                  1.93854
+true theta beats fitted oracle: False (true 1.3823 vs fitted 0.4833 -- fitted should never be worse than true, since it optimizes directly against the same objective; true < fitted by a wide margin would point at a fit_theta optimization issue rather than a solver-form issue)
+
+=== summary (scaled RMSE, lower is better) ===
+fetch_push   persist 0.4109  nominal 4.2252  fitted 0.4833  -> SOLVER DOES NOT BEAT PERSISTENCE

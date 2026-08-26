@@ -1,0 +1,33 @@
+AdroitHandRelocateDense-v1, AdroitHandHammerDense-v1, AdroitHandDoorDense-v1 environment's reward functions were updated in v1.2.1 without an environment version update. Therefore, use gymnasium-robotics==1.2.0 for v1 reproducibility or use v2 in gymnasium-robotics>=1.4.3. See https://github.com/Farama-Foundation/Gymnasium-Robotics/pull/220 for more details
+
+PokeWorld theta recovery -- val R^2 (256 episodes x 48, 60 epochs, seed 1, encoder tiny_cnn, probe source predicted, probe_hidden 0)
+
+  windows after observability filter: 10496 train / 2624 val
+  decodable = supervised ridge read-out on the FROZEN latent
+              (upper bound: is the physics encoded at all?)
+  own probe = the model's unsupervised probe through the solver
+
+param      predictive/decodable  predictive/own_probe      physwm/decodable      physwm/own_probe
+mass                    -0.6688               -2.0463               -0.3423               -2.7533
+friction                -0.7250               -0.0063               -0.4622               -2.7647
+
+Dynamics-coordinate recovery -- val R^2
+coordinate  predictive/decodable  predictive/own_probe      physwm/decodable      physwm/own_probe
+mass                    -0.6688               -2.0463               -0.3423               -2.7533
+friction                -0.7250               -0.0063               -0.4622               -2.7647
+
+Prediction/fidelity RMSE on the SAME held-out checkpoints
+metric                            predictive          physwm
+path_a_vs_dataset                     0.3984          0.4002
+path_a_query_vs_dataset               0.4282          0.4274
+path_b_vs_teacher                     8.6647          0.7687
+path_b_vs_dataset                     8.6545          0.8111
+persistence_vs_dataset                0.6293          0.6293
+persistence_query_vs_dataset          0.6562          0.6562
+
+reading it: if `predictive/decodable` is near zero the predictive
+objective never encoded that parameter -- which is the claim. If it is
+high but `predictive/own_probe` is low, the physics was already there
+and only the read-out was missing.
+
+wrote /workspace/physwm-artifacts/runs/fetch-matrix-256ep/A_fetch_claim_seed1.json

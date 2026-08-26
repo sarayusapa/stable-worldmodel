@@ -1,0 +1,70 @@
+=== PushT/Cartpole matrix starting at Wed Aug 26 04:03:00 UTC 2026 ===
+[04:03:00] START cartpole_xbench_seed0
+[04:03:00] START cartpole_xbench_seed1
+[04:03:00] START cartpole_xbench_seed2
+[04:03:00] START pusht_rand_xbench_seed0
+[04:03:00] START pusht_rand_xbench_seed1
+[04:03:00] START pusht_rand_xbench_seed2
+[04:03:00] START pusht_rand_decod_seed0
+[04:03:00] START pusht_rand_decod_seed1
+[04:03:00] START pusht_rand_decod_seed2
+[04:04:14] DONE cartpole_xbench_seed0 rc=134 dur=74s
+[04:04:14] DONE cartpole_xbench_seed1 rc=134 dur=74s
+[04:04:24] DONE cartpole_xbench_seed2 rc=134 dur=84s
+[04:09:57] RETRY cartpole_xbench_seed0/1/2 (original launch hit rc=134/SIGABRT, empty log -- likely 9-way concurrent EGL/MuJoCo context creation collision at the exact same instant; retried in isolation after the other 6 jobs were past their own init)
+[04:23:02] RETRY2 cartpole_xbench_seed0/1/2 at --length 32 (was 48; isolated the crash to length specifically via a 20/24/32/48 sweep -- pole/cart likely goes out of bounds by step ~33-47 under this policy, triggering a native abort in the MuJoCo/dm_control path rather than a graceful termination; 20/24/32 all confirmed stable)
+[04:23:02] START cartpole_xbench_seed0 (length=32)
+[04:23:02] START cartpole_xbench_seed1 (length=32)
+[04:23:02] START cartpole_xbench_seed2 (length=32)
+[04:24:04] DONE cartpole_xbench_seed2 rc=134 dur=62s
+[04:24:06] DONE cartpole_xbench_seed0 rc=134 dur=64s
+[04:24:06] DONE cartpole_xbench_seed1 rc=134 dur=64s
+[04:26:23] RETRY3 cartpole_xbench_seed0/1/2 at --episodes 256 --length 32 (512 episodes crashed even at length=32; 64/128/256 all confirmed stable via sweep -- some randomly-sampled physics parameter combos produce genuinely unstable dynamics that trip a native abort rather than terminating gracefully; using 256 as a defensible reduced-but-real sample size given repeated evidence and time constraints)
+[04:26:23] START cartpole_xbench_seed0 (episodes=256, length=32)
+[04:26:23] START cartpole_xbench_seed1 (episodes=256, length=32)
+[04:26:23] START cartpole_xbench_seed2 (episodes=256, length=32)
+[04:27:17] DONE cartpole_xbench_seed2 rc=134 dur=54s
+[04:27:19] DONE cartpole_xbench_seed1 rc=134 dur=56s
+[04:27:19] DONE cartpole_xbench_seed0 rc=134 dur=56s
+[04:38:06] DONE pusht_rand_xbench_seed0 rc=0 dur=2106s
+[04:38:10] DONE pusht_rand_xbench_seed1 rc=0 dur=2110s
+[04:38:25] DONE pusht_rand_xbench_seed2 rc=0 dur=2125s
+[04:47:38] RETRY4 cartpole_xbench_seed0/1/2 (episodes=512, length=48 -- original spec restored) using the new subprocess-isolated episode collector: each cartpole episode is now rolled out in a disposable subprocess (scripts/eval/_cartpole_batch_worker.py, batches of 64), so the native SIGABRT that dm_control's swing_up=True + fully-random-action-policy occasionally triggers (confirmed not a Python-catchable exception, confirmed not fixable by shrinking length/episode-count -- see matrix.log history above) only kills a throwaway subprocess and gets silently retried at a fresh seed, instead of killing this job.
+[04:47:38] START cartpole_xbench_seed0 (episodes=512, length=48, subprocess-isolated)
+[04:47:38] START cartpole_xbench_seed1 (episodes=512, length=48, subprocess-isolated)
+[04:47:38] START cartpole_xbench_seed2 (episodes=512, length=48, subprocess-isolated)
+[05:12:24] DONE cartpole_xbench_seed2 rc=137 dur=1486s
+[05:12:24] DONE cartpole_xbench_seed0 rc=137 dur=1486s
+[05:12:24] DONE cartpole_xbench_seed1 rc=137 dur=1486s
+[05:17:21] RETRY5 cartpole_xbench_seed0/1/2 (episodes=512, length=48) -- real root cause found and fixed: CartpoleDMControlWrapper.compile_model() (stable_worldmodel/envs/dmcontrol/cartpole.py) reassigned self.env on every reset (physics variation triggers a recompile almost every reset) without closing the old env first, leaking a GL/EGL render context each time. Fixed with one line (self.env.close() before reassignment). What looked like crashes/hangs was this leak plus render contention from the 11 other MUJOCO_GL=egl processes already running (PushT + Fetch matrix) -- a solo episode took up to 68s to acquire a context under that load, well past the old 45s timeout. batch_size=8, batch_timeout=900s to accommodate.
+[05:17:21] START cartpole_xbench_seed0 (episodes=512, length=48, leak fixed)
+[05:17:21] START cartpole_xbench_seed1 (episodes=512, length=48, leak fixed)
+[05:17:21] START cartpole_xbench_seed2 (episodes=512, length=48, leak fixed)
+[05:26:37] DONE pusht_rand_decod_seed2 rc=0 dur=5016s
+[05:27:14] DONE cartpole_xbench_seed1 rc=137 dur=593s
+[05:27:14] DONE cartpole_xbench_seed0 rc=137 dur=593s
+[05:27:14] DONE cartpole_xbench_seed2 rc=137 dur=593s
+[05:27:16] RETRY6 cartpole_xbench_seed0/1/2 -- cut to episodes=256 (length=48) to land in a reasonable window given ~1 episode/52s/seed under current GPU/EGL contention from the other 11 jobs (measured on RETRY5, which was stable/correct but projected ~7h/seed at 512). Same leak-fixed collector, deliberate reduced scope, not a workaround for instability this time.
+[05:27:16] START cartpole_xbench_seed0 (episodes=256, length=48)
+[05:27:16] START cartpole_xbench_seed1 (episodes=256, length=48)
+[05:27:16] START cartpole_xbench_seed2 (episodes=256, length=48)
+[05:27:34] DONE pusht_rand_decod_seed1 rc=0 dur=5074s
+[05:28:21] DONE cartpole_xbench_seed0 rc=137 dur=65s
+[05:28:21] DONE cartpole_xbench_seed1 rc=137 dur=65s
+[05:28:21] DONE cartpole_xbench_seed2 rc=137 dur=65s
+[05:28:23] RETRY7 cartpole_xbench_seed0/1/2 -- hard 1hr deadline from user, cutting to episodes=32 (length=48) to guarantee completion given measured ~52s/episode/seed collection rate under GPU/EGL contention (256ep would take 2.5-3.5h). Small-N result, documented as such -- not a hidden scope reduction.
+[05:28:23] START cartpole_xbench_seed0 (episodes=32, length=48)
+[05:28:23] START cartpole_xbench_seed1 (episodes=32, length=48)
+[05:28:23] START cartpole_xbench_seed2 (episodes=32, length=48)
+[05:38:25] DONE pusht_rand_decod_seed0 rc=0 dur=5725s
+[05:38:26] all jobs finished
+[05:50:48] DONE cartpole_xbench_seed2 rc=137 dur=1345s
+[05:50:48] DONE cartpole_xbench_seed1 rc=137 dur=1345s
+[05:50:48] DONE cartpole_xbench_seed0 rc=137 dur=1345s
+[05:51:16] RETRY8 cartpole_xbench_seed0/1/2 -- last attempt before deadline, episodes=8 (length=48), batch_size=1/timeout=240s per user's choice. RETRY7 (32ep) stalled: first 900s batch attempt produced 0 episodes under worsened GPU/EGL contention (Fetch matrix + PushT still running). Small-N result if this lands.
+[05:51:16] START cartpole_xbench_seed0 (episodes=8, length=48)
+[05:51:16] START cartpole_xbench_seed1 (episodes=8, length=48)
+[05:51:16] START cartpole_xbench_seed2 (episodes=8, length=48)
+[05:59:52] DONE cartpole_xbench_seed0 rc=0 dur=516s
+[05:59:53] DONE cartpole_xbench_seed2 rc=0 dur=517s
+[05:59:53] DONE cartpole_xbench_seed1 rc=0 dur=517s

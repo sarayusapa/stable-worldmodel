@@ -1,0 +1,18 @@
+
+cartpole / target=path_a / seed=0
+  windows: train=328 val=82
+  Path A 1.0976 vs persistence 0.1998
+  substitution (scaled RMSE vs observed s_next, lower better):
+    probe      0.12840
+    nominal    0.00646
+    shuffled   0.12052
+  probe beats nominal: False   beats shuffled: False
+  sensitivity:
+    cart_mass         0.01792   (theta sd 0.08491)
+    pole_mass         0.00516   (theta sd 0.09236)
+    pole_half_length  0.01542   (theta sd 0.02239)
+    gravity           0.00783   (theta sd 0.7284)
+    force_gain        0.02215   (theta sd 0.9979)
+    cart_damping      0.00671   (theta sd 0.4808)
+
+wrote /workspace/physwm-artifacts/runs/pusht-cartpole-matrix/cartpole_xbench_seed0.json

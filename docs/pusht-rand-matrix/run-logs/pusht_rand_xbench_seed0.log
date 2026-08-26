@@ -1,0 +1,25 @@
+/workspace/stable-worldmodel/.venv/lib/python3.10/site-packages/gymnasium/spaces/box.py:415: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  gym.logger.warn("Casting input x to numpy array.")
+/workspace/stable-worldmodel/.venv/lib/python3.10/site-packages/gymnasium/utils/passive_env_checker.py:157: UserWarning: [33mWARN: The obs returned by the `step()` method is not within the observation space.[0m
+  logger.warn(f"{pre} is not within the observation space.")
+
+pusht_rand / target=path_a / seed=0
+  windows: train=20992 val=5248
+  Path A 0.6198 vs persistence 0.5837
+  substitution (scaled RMSE vs observed s_next, lower better):
+    probe      0.19519
+    nominal    0.21426
+    shuffled   0.25241
+  probe beats nominal: True   beats shuffled: True
+  sensitivity:
+    agent_kp           0.03985   (theta sd 20.23)
+    agent_kv           0.03710   (theta sd 3.141)
+    agent_radius       0.00108   (theta sd 5.364)
+    block_radius       0.00269   (theta sd 13.51)
+    contact_stiffness  0.00193   (theta sd 1.45)
+    mobility_lin       0.00146   (theta sd 0.1624)
+    mobility_ang       0.00127   (theta sd 9.727e-05)
+    com_offset_x       0.00173   (theta sd 2.879)
+    com_offset_y       0.00146   (theta sd 7.716)
+
+wrote /workspace/physwm-artifacts/runs/pusht-cartpole-matrix/pusht_rand_xbench_seed0.json

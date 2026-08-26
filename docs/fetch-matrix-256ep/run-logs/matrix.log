@@ -1,0 +1,19 @@
+=== Fetch matrix starting at Wed Aug 26 00:20:30 UTC 2026 ===
+[00:20:30] START A_fetch_claim_seed0
+[01:10:39] DONE A_fetch_claim_seed0 rc=0 dur=3009s
+[01:10:39] START A_fetch_claim_seed1
+[02:02:01] DONE A_fetch_claim_seed1 rc=0 dur=3082s
+[02:02:01] START A_fetch_claim_seed2
+[02:37:26] START B_fetch_preaction_seed0 (parallel)
+[02:37:26] START C_fetch_dataset_target_seed0 (parallel)
+[02:37:26] START C_fetch_posthoc_seed0 (parallel)
+[02:37:26] START H_fetch_vq_seed0 (parallel)
+[02:37:26] START F_fetch_functional_seed0 (parallel)
+[03:07:41] DONE A_fetch_claim_seed2 rc=0 dur=3940s
+[03:07:41] START B_fetch_preaction_seed0
+[03:11:26] DONE F_fetch_functional_seed0 rc=0 dur=2040s
+[03:14:30] DONE C_fetch_posthoc_seed0 rc=0 dur=2224s
+[03:14:31] DONE B_fetch_preaction_seed0 rc=0 dur=2225s
+[03:14:41] DONE H_fetch_vq_seed0 rc=0 dur=2235s
+[03:14:52] DONE C_fetch_dataset_target_seed0 rc=0 dur=2246s
+[03:14:52] all parallel jobs finished

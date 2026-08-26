@@ -1,0 +1,48 @@
+/workspace/stable-worldmodel/.venv/lib/python3.10/site-packages/gymnasium/spaces/box.py:415: UserWarning: [33mWARN: Casting input x to numpy array.[0m
+  gym.logger.warn("Casting input x to numpy array.")
+
+PokeWorld theta recovery -- val R^2 (512 episodes x 48, 40 epochs, seed 1, encoder tiny_cnn, probe source predicted, probe_hidden 0)
+
+  windows after observability filter: 20992 train / 5248 val
+  decodable = supervised ridge read-out on the FROZEN latent
+              (upper bound: is the physics encoded at all?)
+  own probe = the model's unsupervised probe through the solver
+
+param               predictive/decodable  predictive/own_probe      physwm/decodable      physwm/own_probe
+agent_kp                          0.1465               -0.1855                0.1346               -0.0361
+agent_kv                          0.1465               -0.1271                0.0664               -0.1149
+agent_radius                         nan                   nan                   nan                   nan
+block_radius                         nan                   nan                   nan                   nan
+contact_stiffness                    nan                   nan                   nan                   nan
+mobility_lin                         nan                   nan                   nan                   nan
+mobility_ang                         nan                   nan                   nan                   nan
+com_offset_x                         nan                   nan                   nan                   nan
+com_offset_y                         nan                   nan                   nan                   nan
+
+Dynamics-coordinate recovery -- val R^2
+coordinate          predictive/decodable  predictive/own_probe      physwm/decodable      physwm/own_probe
+agent_kp                          0.1465               -0.1855                0.1346               -0.0361
+agent_kv                          0.1465               -0.1271                0.0664               -0.1149
+agent_radius                         nan                   nan                   nan                   nan
+block_radius                         nan                   nan                   nan                   nan
+contact_stiffness                    nan                   nan                   nan                   nan
+mobility_lin                         nan                   nan                   nan                   nan
+mobility_ang                         nan                   nan                   nan                   nan
+com_offset_x                         nan                   nan                   nan                   nan
+com_offset_y                         nan                   nan                   nan                   nan
+
+Prediction/fidelity RMSE on the SAME held-out checkpoints
+metric                            predictive          physwm
+path_a_vs_dataset                     0.4908          0.4751
+path_a_query_vs_dataset               0.4864          0.4700
+path_b_vs_teacher                     0.4467          0.4276
+path_b_vs_dataset                     0.2422          0.2147
+persistence_vs_dataset                0.6214          0.6214
+persistence_query_vs_dataset          0.6181          0.6181
+
+reading it: if `predictive/decodable` is near zero the predictive
+objective never encoded that parameter -- which is the claim. If it is
+high but `predictive/own_probe` is low, the physics was already there
+and only the read-out was missing.
+
+wrote /workspace/physwm-artifacts/runs/pusht-cartpole-matrix/pusht_rand_decod_seed1.json
