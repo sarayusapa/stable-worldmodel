@@ -1,19 +1,29 @@
-\documentclass[11pt]{article}
+\documentclass{article}
 
 % ---------------------------------------------------------------------
-% Packages
+% NeurIPS style. "preprint" = non-anonymized, arXiv-style; no workshop
+% title or double-blind line numbers needed at this draft stage. Swap
+% to [dblblindworkshop]/[sglblindworkshop] (with \workshoptitle{...})
+% or [main] when a venue is picked -- see neurips_2026.tex for options.
 % ---------------------------------------------------------------------
-\usepackage[margin=1in]{geometry}
+\usepackage[preprint]{neurips_2026}
+
+% ---------------------------------------------------------------------
+% Packages. geometry is NOT loaded here -- neurips_2026.sty sets the
+% page geometry itself and tweaking it is grounds for desk rejection.
+% ---------------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage[capitalize]{cleveref}
-\usepackage{natbib}
 \usepackage{microtype}
 \usepackage{enumitem}
 \usepackage{xspace}
+\usepackage{nicefrac}
 
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta, positioning, fit, backgrounds, calc, shapes.geometric, decorations.pathreplacing}
@@ -35,15 +45,14 @@
 \newcommand{\loss}{\ensuremath{\mathcal{L}}}
 \newcommand{\TODO}[1]{{\color{red}\textbf{[TODO: #1]}}}
 
-\title{\vspace{-1em}Filling the Hierarchy from the Top:\\
+\title{Filling the Hierarchy from the Top:\\
 Inducing Physical Latents from a World Model's Own Predictions}
 
-\author{
+\author{%
   \TODO{author list} \\
-  \TODO{affiliation}
+  \TODO{affiliation} \\
+  \texttt{\TODO{email}}
 }
-
-\date{\TODO{venue / date}}
 
 \begin{document}
 \maketitle
