@@ -63,6 +63,125 @@ Copy this block for each new run.
 
 ## Log
 
+### 2026-08-26 — PushT-randomized (`pusht_rand`) matrix, 512 episodes, 6 jobs, logged post hoc
+
+- **Command:** `matrix.log` records a combined PushT/Cartpole orchestrator
+  run starting `2026-08-26 04:03:00 UTC`; the 6 `pusht_rand` jobs ran
+  cleanly on their first attempt (only the co-scheduled Cartpole jobs
+  needed retries, see the separate note below). Exact per-job command
+  lines are not preserved beyond `matrix.log`'s job names; full config is
+  recoverable from each JSON's `meta` block.
+- **Config:** `encoder=tiny_cnn, episodes=512, length=48, window=8,
+  epochs=40, tactile=True`. Two scripts, two questions:
+  - `pusht_rand_decod_seed{0,1,2}` — `scripts/eval/decodability.py
+  --benchmark pusht_rand --conditions predictive,physwm`, the labeled R²
+  check on `agent_kp`/`agent_kv` (the only two theta components with a
+  real recorded ground truth; `PushTSolver` reproduces the environment's
+  own PD law exactly).
+  - `pusht_rand_xbench_seed{0,1,2}` — `scripts/eval/cross_benchmark.py
+  --benchmark pusht_rand`, a label-free probe/shuffled/nominal check that
+  doesn't require ground truth for every theta component, `alpha=1.0`
+  only (no `predictive` condition).
+- **Seed(s):** 0, 1, 2 for both scripts.
+- **Commit / working tree:** `efa1e5a` (this same commit added the
+  results to the repo), clean at time of logging.
+- **Hardware:** unknown (not recorded in the JSON `meta`); run
+  concurrently with the Fetch and Cartpole matrices on the same pod per
+  `matrix.log` (12 jobs co-scheduled), which is relevant context for the
+  Cartpole GL/EGL contention note below even though it doesn't affect
+  these 6 jobs' correctness.
+- **Data:** `pusht_rand`, 512 episodes x 48 steps; 20992 train / 5248 val
+  windows after the observability filter, all 6 jobs.
+- **Duration:** per `matrix.log`, the 3 `xbench` jobs finished at
+  ~04:38 UTC (~35 min from a 04:03 start); the 3 `decod` jobs finished
+  between 05:26 and 05:38 UTC (~85-95 min), all `rc=0`.
+- **Status:** pass, all 6 jobs.
+- **Artifacts:** `docs/pusht-rand-matrix/run-results/*.json` (6 files,
+  committed), `docs/pusht-rand-matrix/run-logs/*.log` (local-only, per
+  this repo's `*.log` gitignore convention), `docs/pusht-rand-matrix/
+  READING_THE_LOGS.md` (interpretation guide, same style as the Fetch
+  matrix's).
+
+**Label-free check — `cross_benchmark.py`, scaled RMSE (lower better)**
+
+| seed | probe | shuffled | nominal | shuffled$-$probe | beats\_nominal | beats\_shuffled |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | 0.1952 | 0.2524 | 0.2143 | 0.0572 | true | true |
+| 1 | 0.2128 | 0.2729 | 0.2395 | 0.0601 | true | true |
+| 2 | 0.2155 | 0.2751 | 0.2095 | 0.0597 | **false** | true |
+
+| seed | path\_a | persistence | path\_a beats persistence? |
+| --- | --- | --- | --- |
+| 0 | 0.6198 | 0.5837 | **no** |
+| 1 | 0.4751 | 0.6214 | yes |
+| 2 | 0.4638 | 0.5347 | yes |
+
+Sensitivity (10% theta bump, all 3 seeds): `agent_kp` 0.0383-0.0398,
+`agent_kv` 0.0351-0.0371 — an order of magnitude above every other
+component (`agent_radius`, `block_radius`, `contact_stiffness`,
+`mobility_lin`, `mobility_ang`, `com_offset_x/y`, all 0.0011-0.0074
+across seeds).
+
+**Labeled R² check — `decodability.py`, `agent_kp`/`agent_kv` only
+(every other theta component is `NaN` by construction: no
+`pusht_rand` branch in `dynamics_coordinates()`, same reporting gap as
+`fetch_push`)**
+
+| seed | predictive/decodable kp | predictive/decodable kv | predictive/own\_probe kp | predictive/own\_probe kv | physwm/decodable kp | physwm/decodable kv | physwm/own\_probe kp | physwm/own\_probe kv |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | -0.0702 | -0.3476 | -0.1647 | -0.1246 | 0.0830 | -0.0263 | -0.0117 | 0.0149 |
+| 1 | 0.1465 | 0.1465 | -0.1855 | -0.1271 | 0.1346 | 0.0664 | -0.0361 | -0.1149 |
+| 2 | 0.0038 | 0.0199 | -0.1167 | -0.1339 | -0.2088 | -0.0507 | 0.2261 | -0.3479 |
+
+- **Notes:** Read together, these two scripts test different bars.
+  `cross_benchmark.py` only asks whether inferred theta distinguishes
+  episodes and beats a fixed default, not whether it matches the exact
+  PD-gain values — and on that bar the signal is real and consistent:
+  `probe` beats `shuffled` in all 3 seeds by a stable margin
+  (0.057-0.060), meaning episode-specific theta is carrying real
+  information, not noise. This is a materially healthier result than
+  the pre-fix Fetch functional-use check, where the equivalent gap was
+  near zero (`-0.011`, see the 2026-08-26 Fetch matrix entry) — here
+  theta clearly matters to the frozen solver's own prediction. `probe`
+  also beats `nominal` in 2/3 seeds (seed 2 misses narrowly, 0.2155 vs
+  0.2095). Sensitivity confirms this makes physical sense: `agent_kp`/
+  `agent_kv` directly set how hard the PD-controlled agent pushes, so
+  the dynamics are far more sensitive to them than to the block's
+  second-order properties (`com_offset`, `mobility`, `contact_stiffness`).
+
+  `decodability.py`'s labeled R² is a stricter bar (does theta match
+  the literal PD-gain value, not just distinguish episodes) and mostly
+  isn't cleared at 512 episodes: `own_probe` R² for `agent_kp`/`agent_kv`
+  is negative in most seed/condition cells. Same qualitative shape as
+  PokeWorld (needed 2048 episodes before its labeled ceiling turned
+  positive) and Fetch (256 episodes likely below its floor too) — not
+  yet checked whether `pusht_rand` needs the same larger budget, or
+  whether 512 is already enough and something else is limiting it.
+
+  **`path_a` does not beat `persistence` in seed 0** (0.6198 vs
+  0.5837) — the teacher premise (\Cref{sec:setup-protocol}-style, "Path
+  A must beat persistence before parameter recovery is interpretable")
+  fails for that one seed. Worth flagging before citing seed-0 numbers
+  specifically in the paper; seeds 1 and 2 hold.
+
+  **Cartpole, co-scheduled in the same `matrix.log`, is separately
+  documented as still incomplete** (do not infer it finished from this
+  entry): after `rc=134` SIGABRT crashes across 4 retries at shrinking
+  episode/length combinations, `matrix.log` records a real root cause
+  found and fixed — `CartpoleDMControlWrapper.compile_model()`
+  (`stable_worldmodel/envs/dmcontrol/cartpole.py`) reassigned `self.env`
+  on every physics-variation reset without closing the previous env
+  first, leaking a GL/EGL render context each time; under the load of
+  11 other concurrently-running `MUJOCO_GL=egl` jobs, context creation
+  could take up to 68s, well past the old 45s timeout, reading as a hang
+  or crash. Fixed with one line (`self.env.close()` before
+  reassignment). After the fix, a hard 1-hour deadline forced episode
+  count down through 512 -> 256 -> 32 to guarantee completion under
+  measured ~52s/episode/seed collection speed; the final attempt
+  (`episodes=32, length=48`) started at 05:28:23 UTC but its outcome is
+  not in `matrix.log` and no result JSON exists in the repo yet. Treat
+  Cartpole as unresolved, not as a small-N result already in hand.
+
 ### 2026-08-26 — Gripper overshoot fixed in `FetchPushSolver`; re-verified with `validate_solvers.py`
 
 Follow-up to the entry directly below. Applies the one-line fix that entry

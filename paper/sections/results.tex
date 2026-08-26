@@ -127,22 +127,77 @@ modeling limitation: the frozen solver's gripper term was applying its
 per-transition action displacement once per integration substep instead
 of once per transition, a $10\times$ overshoot with no dependence on
 $\theta$ at all, which confounded every number the 256-episode run
-produced. The fix is a one-line change to the affected term; the matrix
+produced. The fix is a one-line change to the affected term, verified
+at the matrix's own 256-episode scale: the gripper channel is fixed,
+but the oracle fit still does not beat persistence overall (0.483 vs
+0.411), and correctly beats the true $\theta$ (1.382 against the same
+persistence baseline), which rules out an optimization artifact and
+narrows the residual gap to the solver's functional form, a fixed
+contact stiffness and a point-mass, linear-friction approximation that
+may not suit Fetch as well as it suits \textsc{PokeWorld}. The matrix
 has not yet been re-run against the corrected solver, so we do not
-report Fetch numbers here.
+report Fetch theta-recovery numbers here.
 
-\paragraph{Cart-pole and randomized Push-T.} Two further benchmarks are
-running under the same recipe, unchanged. Cart-pole
-(\Cref{sec:setup-benchmarks}) has no registered ground truth at all
-(\texttt{has\_theta\_true: False}), so it tests the label-free claim
-where no $R^2$ certificate is even possible in principle, only
+\paragraph{Randomized Push-T.} Standard Push-T has fixed dynamics,
+which makes a shuffled-theta control vacuous (permuting a constant
+changes nothing), so we run a per-episode randomized variant instead:
+the environment's own PD-control gains $k_p, k_v$ are ground truth by
+construction, and object mass/friction are randomized too, to make the
+shuffled control meaningful, even though the solver has no exact
+ground-truth counterpart for the latter two. Two different bars, on
+512 episodes, 3 seeds each. The label-free bar, does inferred $\theta$
+distinguish episodes and beat the solver's fixed default, without
+asking whether it matches $k_p, k_v$ exactly, is cleared cleanly:
+$\theta$ from the probe beats a shuffled episode's $\theta$ in all
+three seeds by a stable margin (scaled RMSE gap $0.057$--$0.060$), and
+beats the solver's nominal default in two of three (\Cref{tab:pusht-rand-xbench}).
+Sensitivity confirms this is physically sensible: the solver's output
+moves an order of magnitude more from a $10\%$ bump in $k_p$ or $k_v$
+($0.035$--$0.040$) than from any other component
+($0.001$--$0.007$), matching the intuition that the PD gains directly
+set how hard the agent pushes while the block's own properties are a
+second-order effect on the response. The stricter, labeled bar, does
+the probe's $\theta$ match the recorded $k_p, k_v$ value, mostly is not
+cleared at this budget: own\_probe $R^2$ is negative in most
+seed/condition cells, the same qualitative pattern PokeWorld needed
+2048 episodes and Fetch needed more than 256 to clear. One caveat
+before citing this benchmark further: \pathA fails to beat persistence
+in seed 0 specifically (0.620 vs 0.584), so the teacher premise
+(\Cref{sec:setup-protocol}) does not hold for that seed, and its
+numbers should be read with that in mind.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lccc}
+\toprule
+Seed & Probe & Shuffled & Nominal \\
+\midrule
+0 & 0.195 & 0.252 & 0.214 \\
+1 & 0.213 & 0.273 & 0.240 \\
+2 & 0.216 & 0.275 & \textbf{0.210} \\
+\bottomrule
+\end{tabular}
+\caption{Randomized Push-T, label-free substitution (scaled RMSE, lower
+better): the frozen solver fed the probe's $\theta$, a shuffled
+episode's $\theta$, and its own fixed nominal $\theta$, scored against
+the real observed transition. Bold marks the one cell where probe does
+not beat nominal (seed 2, by a narrow margin).}
+\label{tab:pusht-rand-xbench}
+\end{table}
+
+\paragraph{Cart-pole.} Running under the same recipe, unchanged.
+Cart-pole (\Cref{sec:setup-benchmarks}) has no registered ground truth
+at all (\texttt{has\_theta\_true: False}), so it tests the label-free
+claim where no $R^2$ certificate is even possible in principle, only
 prediction quality and the functional-use tests of
-\Cref{sec:setup-protocol}. Standard Push-T has fixed dynamics, which
-makes a shuffled-theta control vacuous, so we additionally run a
-per-episode randomized variant in which the environment's own PD-control
-gains are ground truth by construction and object mass/friction are
-randomized to make the shuffled control meaningful, even though the
-solver has no exact ground-truth counterpart for the latter two.
-Both jobs were still in progress at the time of writing; we report
-their outcome once complete rather than characterize a run before it
-has finished.
+\Cref{sec:setup-protocol}. This run surfaced its own infrastructure bug
+worth recording: \texttt{CartpoleDMControlWrapper.compile\_model()}
+reassigned its environment on every physics-variation reset without
+closing the previous one first, leaking a render context each time,
+which under concurrent load read as a hang or crash rather than an
+out-of-memory error. Fixed with one line. A one-hour scheduling
+constraint then forced episode count down through 512, 256, and 32 to
+guarantee completion under the resulting collection rate; the smallest
+attempt had not finished at the time of writing, so we report no
+Cart-pole numbers here and do not treat the partial run as a small-$N$
+result in hand.
