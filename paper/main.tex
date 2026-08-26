@@ -1,0 +1,98 @@
+\documentclass[11pt]{article}
+
+% ---------------------------------------------------------------------
+% Packages
+% ---------------------------------------------------------------------
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage[capitalize]{cleveref}
+\usepackage{natbib}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{xspace}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds, calc, shapes.geometric, decorations.pathreplacing}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% ---------------------------------------------------------------------
+% Macros
+% ---------------------------------------------------------------------
+\newcommand{\method}{\textsc{PhysWM}\xspace}
+\newcommand{\pathA}{Path~A\xspace}
+\newcommand{\pathB}{Path~B\xspace}
+\newcommand{\theparam}{\ensuremath{\theta}}
+\newcommand{\stategt}{\ensuremath{s_{\mathrm{next}}}}
+\newcommand{\stateA}{\ensuremath{s_A}}
+\newcommand{\stateB}{\ensuremath{s_B}}
+\newcommand{\stopgrad}[1]{\ensuremath{\mathrm{sg}\!\left[#1\right]}}
+\newcommand{\R}{\ensuremath{\mathbb{R}}}
+\newcommand{\loss}{\ensuremath{\mathcal{L}}}
+\newcommand{\TODO}[1]{{\color{red}\textbf{[TODO: #1]}}}
+
+\title{\vspace{-1em}Filling the Hierarchy from the Top:\\
+Inducing Physical Latents from a World Model's Own Predictions}
+
+\author{
+  \TODO{author list} \\
+  \TODO{affiliation}
+}
+
+\date{\TODO{venue / date}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Self-supervised visual encoders learn strong high-level semantics but
+underspecify the low-level abstractions that support them, a hierarchy
+that is tall but thin at the bottom. Physical parameters such as mass,
+drag, and friction are exactly such low-level abstractions, and recent
+work shows that latent world models built on these encoders are
+systematically blind to them even while predicting future states
+accurately. In other words, the model knows what happens next but not
+the physics of why it happens. We ask whether the model's own reliable
+high-level prediction can be used to induce the missing low-level
+physical representation, filling the bottom of the hierarchy from the
+top. We introduce a two-path world model in which the standard latent
+prediction gives an accurate next-state estimate, and a low-capacity
+probe reads physical parameters from the same action-conditioned
+latent, passes them through a frozen physics solver, and is trained to
+reproduce the model's own baseline prediction. The target is the
+model's high-signal prediction rather than a parameter label. The probe
+is low-capacity and the parameters must be optimised to become
+physically meaningful to reproduce the high-signal prediction. We
+instantiate this recipe on contact-rich manipulation (Fetch push, real
+MuJoCo physics), an analytic control task (cart-pole), and Push-T with
+per-episode randomized ground-truth physics, each with its own
+hand-derived, zero-parameter solver.
+\TODO{Headline identifiability numbers: label-free $R^2$ under the
+physics-solver target versus the predictive-only baseline, and the
+supervised decodability ceiling, once the matrix finishes running
+against the corrected solver.}
+\TODO{Under out-of-distribution physical parameters, the physics path
+holds while the free prediction drifts and hallucinates motion; under
+parameter shift the physics-grounded model reaches the goal in
+[xx\%] of episodes against [yy\%] for the predictive baseline.} The
+whole study runs on a single consumer GPU. We
+conclude that a model's own high-level predictions can supervise the
+low-level physical abstractions predictive training leaves latent, and
+we report the size of the remaining gap to a labeled ceiling honestly
+rather than closing it by construction.
+\end{abstract}
+
+\input{sections/introduction}
+\input{sections/related_work}
+\input{sections/method}
+\input{sections/experimental_setup}
+\input{sections/results}
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\end{document}

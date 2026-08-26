@@ -1,0 +1,608 @@
+TITLE
+
+Filling the Hierarchy from the Top: Inducing Physical Latents from a
+World Model's Own Predictions
+
+
+ABSTRACT
+
+Self-supervised visual encoders learn strong high-level semantics but
+underspecify the low-level abstractions that support them, a hierarchy
+that is tall but thin at the bottom. Physical parameters such as mass,
+drag, and friction are exactly such low-level abstractions, and recent
+work shows that latent world models built on these encoders are
+systematically blind to them even while predicting future states
+accurately. The model knows what happens next but not the physics of
+why.
+
+We ask whether the model's own reliable high-level prediction can be
+used to induce the missing low-level physical representation, filling
+the bottom of the hierarchy from the top. We introduce a two-path
+world model in which the standard latent prediction gives an accurate
+next-state estimate, and a low-capacity probe reads physical
+parameters from the same latent, passes them through a frozen
+differentiable physics solver, and is trained to reproduce the
+model's own prediction as a stop-gradient target. Because the target
+is the model's high-signal prediction rather than a parameter label,
+no physics supervision is used; because the physics is frozen and the
+probe is low-capacity, the parameters must become physically
+meaningful to reproduce the prediction.
+
+On PokeWorld, where physical parameters are hidden behind identical
+rendering, this recovers the blind parameters [drag R² 0.x against a
+0.89 recoverability certificate] where the predictive objective alone
+does not, and the recovered parameters are functionally used rather
+than merely decodable. Under out-of-distribution physical parameters,
+the physics path holds while the free prediction drifts and
+hallucinates motion, and this transfers to control: under parameter
+shift the physics-grounded model reaches the goal in [xx%] of
+episodes against [yy%] for the predictive baseline.
+
+The recipe is unchanged across contact-rich pushing (Push-T), an
+analytic control task (cartpole), and PokeWorld, and the whole study
+runs on a single consumer GPU. We conclude that a model's high-level
+semantic predictions can be turned into supervision for the low-level
+physical abstractions it failed to internalise, filling the
+abstraction hierarchy downward.
+
+[Numbers in brackets above are still placeholders, to be filled in
+once the experiments in Section 4 are run.]
+
+
+1. INTRODUCTION
+
+Self-supervised visual encoders trained at scale, DINO (Caron et al.,
+2021), DINOv2 (Oquab et al., 2023), I-JEPA (Assran et al., 2023),
+produce representations that are remarkably good at the tasks they
+are asked to be good at: recognition, retrieval, and, when wired into
+a predictor, forecasting what a scene will look like next. What they
+are not explicitly asked to do is represent the physical quantities
+that generate that future: mass, drag, contact stiffness, gain. A
+next-frame or next-latent prediction objective never forces those
+quantities to become separable, linearly-readable directions in the
+latent space; there is no term in the loss that would notice if they
+didn't. The representation hierarchy such a model builds is, in this
+sense, tall but thin. Rich, well-trained semantics sit at the top. An
+underspecified, largely accidental physical substrate sits at the
+bottom, propping the top up without being legible itself. (See Chen,
+2026, "Are All Scalable Objectives Alike?", for the framing this
+paper's title borrows.)
+
+This is not a hypothetical gap. Prior work on latent world models
+built on such encoders shows the blindness directly: a model can
+predict the next state of a physical system with low error while its
+latent carries almost no linearly-recoverable information about the
+physical parameters that produced that trajectory (Tan et al., 2026).
+The model knows what happens next. It has no representation of why.
+This has consequences beyond interpretability: a next-state predictor
+that never internalized the underlying physics has no reason to
+generalize when that physics changes (a lighter object, a stiffer
+contact, a different actuator gain), because nothing in its training
+signal ever asked it to separate the dynamics from the specific
+trajectories it was shown.
+
+The standard fix is supervision: label the physical parameters and
+regress them. This is often unavailable, real video has no mass
+channel, and it changes the question being asked in a way that
+matters more than the missing labels do. Fitting a probe to a
+parameter label tests whether that label is recoverable from the
+latent by some function. It says nothing about whether the physics is
+what the world model actually uses to predict. We want the opposite
+kind of evidence: physical parameters that are functionally
+responsible for a prediction the model already trusts, recovered
+without ever showing the model a parameter label.
+
+[Figure 1: "Filling a thin foundation from the top." Self-supervised
+encoders build a hierarchy that is tall at the top (rich semantics)
+but thin at the bottom (physical structure). A world model trained
+only for next-state prediction inherits this shape: it gets the top
+level right without the bottom level ever becoming physically
+meaningful. We use the reliable top-level signal, the model's own
+next-state prediction, as the training target for a low-capacity,
+physics-constrained probe at the bottom, without ever touching a
+physical-parameter label.]
+
+Our approach uses the model against itself. A next-state predictor
+trained the ordinary way is, by construction, the most reliable
+signal available about what the model believes happens next: it is
+exactly what the bulk of the model's capacity was optimized to get
+right, so a low-capacity probe should have an easier time being
+honest about it than about a raw dataset label the rest of the model
+was never optimized against. Instead of supervising the thin bottom
+of the hierarchy with an external physical label, we supervise it
+with the reliable top of the hierarchy the model already built. We
+add a second, low-capacity readout to the same latent that emits a
+small vector of physical parameters theta. We pass theta through a
+frozen, differentiable physics solver together with the current state
+and action, and train the resulting prediction to match the model's
+own next-state prediction under a stop-gradient. Never the dataset
+label. Because the solver is frozen and the probe has almost no
+capacity of its own (a single linear map by default), the second path
+can only reduce its loss by making theta a physically meaningful
+explanation of a prediction the model was already making for other
+reasons.
+
+This gives a training signal for the physical substrate that costs no
+physics annotation, is derived entirely from the model's own
+predictive competence, and is falsifiable by construction. If the
+recovered theta carries no functional weight, it should fail to
+transfer under distribution shift and should not improve control:
+exactly the two things we measure. Our contributions:
+
+1. A two-path world model in which a standard latent next-state
+predictor and a physics-solver path read from the same encoder
+latent, trained so the physics path targets the predictor's own
+stop-gradient output rather than a dataset label or a
+physical-parameter annotation (Method, Section 3).
+
+2. An instantiation of the recipe with three hand-derived,
+zero-parameter differentiable solvers, a point-mass contact model, a
+cart-pole, and a quasi-static planar-pushing model, showing the
+recipe is unchanged across a synthetic identifiability benchmark, an
+analytic control task, and a contact-rich manipulation task, all
+trainable on a single consumer GPU (Experimental Setup, Section 4).
+
+3. On PokeWorld, where the true physical parameters are known but
+hidden behind identical rendering, a measurement of how much
+ground-truth parameter variation the induced theta explains, via an
+R² identifiability certificate that reports the benchmark's built-in
+non-identifiabilities rather than hiding them.
+
+4. A test of whether the recovered parameters are used rather than
+merely decodable: evaluation under out-of-distribution physical
+parameters and downstream model-predictive control, where a decodable
+but functionally inert theta would not help.
+
+
+2. RELATED WORK
+
+Self-supervised visual representations and their hierarchy.
+Contrastive and self-distillation objectives (Caron et al., 2021;
+Oquab et al., 2023) and masked or joint-embedding objectives (Assran
+et al., 2023; He et al., 2022) produce visual features that transfer
+well to downstream recognition and, increasingly, to world modeling
+(Zhou et al., 2024). Probing studies of such representations
+typically ask whether a concept is linearly recoverable somewhere in
+the network (Alain & Bengio, 2016). We ask a stronger, functional
+version of that question: whether a concept is recoverable in a form
+that, once pushed through the physics it is supposed to govern,
+reproduces a prediction the model already relies on. The framing of
+representation hierarchies as tall at the top and thin at the bottom,
+and of using a reliable upper level to train an underspecified lower
+one, follows Chen (2026).
+
+Latent world models. Predicting forward in a learned latent space
+rather than in pixel space (Ha & Schmidhuber, 2018; Hafner et al.,
+2019; Hafner et al., 2020; Hafner et al., 2023) is now the standard
+recipe for model-based control from images. DINO-WM (Zhou et al.,
+2024) predicts forward directly in a frozen, pretrained DINO latent
+with a block-causal spatio-temporal transformer, decoupling
+representation learning from dynamics learning. Path A of our
+architecture is this recipe unmodified; we reuse the same predictor
+family so that the physics path in Path B has an accurate,
+unremarkable baseline to be compared against. None of these models
+include a term that asks the latent to expose the physical parameters
+underlying the dynamics it predicts. That gap is what Path B targets.
+
+Physical identifiability of latent world models. Tan et al. (2026)
+measures the gap directly: latent world models can be accurate on
+next-state prediction while a linear probe recovers almost nothing
+about the physical parameters that generated the trajectory. Two
+things from that work carry over into our setup. First, its central
+negative result, that ratio-type parameters (stiffness over mass,
+say) are not individually identifiable from trajectories no matter
+how good the probe, is a structural fact about the dynamics, not a
+property of any particular estimator, so PokeWorld (Section 4)
+reproduces it deliberately rather than trying to engineer around it.
+Second, its probing methodology, fit a probe against a known
+parameter label and report R², is exactly what we adopt as a
+certificate once a model exists to certify. The difference is what
+trains the model in the first place: that line of work measures
+identifiability with a supervised probe after the fact; the training
+signal we introduce uses no physical-parameter label at all.
+
+Physics-informed and structured dynamics models. Interaction networks
+and graph-based simulators (Battaglia et al., 2016) build physical
+structure into the model itself, and physics-informed objectives
+regularize a network toward known conservation laws or equations of
+motion. Both typically learn the dynamics function end to end, or
+supervise physical quantities directly. Our solver is instead
+hand-derived and frozen: it owns zero learnable parameters by
+construction (Section 3), so the physics is fixed in advance and only
+the mapping from the visual latent to the solver's input parameters
+is learned. Functionally this is closer to differentiable simulation
+used as a fixed decoder than to physics-informed regularization of a
+learned dynamics function.
+
+Self-distillation and self-generated targets. Training a network
+against its own stop-gradient output rather than an external label
+goes back to classical knowledge distillation (Hinton et al., 2015)
+and appears without labels in teacher-student self-distillation
+(Caron et al., 2021; Grill et al., 2020) and in joint-embedding
+predictive architectures that predict entirely in representation
+space (Assran et al., 2023). Those methods use a self-generated
+target to train another representation of the same kind: an embedding
+predicting another embedding. We reuse the same mechanism for a
+different purpose. A self-generated target (the next-state
+prediction) trains a representation of a different kind (physical
+parameters), and the mapping between them is a fixed physical model
+rather than another learned network. The stop-gradient also serves a
+different role here than it does in those methods. It is not
+preventing representational collapse; it is enforcing the one-way
+dependency the experiment needs, so the physics path can never pull
+the general predictor toward itself (Section 3).
+
+Contact-rich manipulation and quasi-static pushing. Push-T (Chi et
+al., 2023) is a standard benchmark for contact-rich manipulation
+policies. We reuse its dynamics as one of three testbeds and model
+the block with the standard quasi-static limit-surface approximation
+for planar pushing, in which the block has no momentum and its motion
+is a function of the instantaneous contact wrench. A T-shaped block
+approximated as a disc is a known, documented mismatch, and Section 4
+treats it as part of what the benchmark tests rather than something
+to hide. The cart-pole solver uses the standard analytic cart-pole
+equations of motion, evaluated against rollouts from the DeepMind
+Control Suite (Tassa et al., 2018).
+
+
+3. METHOD
+
+This section defines the two-path world model (PhysWM) precisely: the
+shared encoder and two prediction heads (3.1), the objective that
+couples them (3.2), and the four structural properties that make the
+recovered physical parameters a claim about the model rather than an
+artifact of how it was trained (3.3).
+
+3.1 Shared latent, two heads
+
+Given an observation window (pixels, or raw state for the ablation in
+Section 4), a single encoder f_phi produces per-frame patch tokens
+z_t. Every downstream module reads from this one z; none has a
+private view of the observation.
+
+Path A is a standard learned predictor. A block-causal
+spatio-temporal transformer g_psi (Zhou et al., 2024) attends over
+all patches of frames up to and including t and predicts a residual
+update to the next frame's tokens:
+
+  z_hat_(t+1) = z_t + g_psi(z_1:t, a_1:t)
+
+A decoder d_chi pools z_hat_(t+1) over patches and reads out a state
+estimate:
+
+  s_A,(t+1) = d_chi(z_hat_(t+1))
+
+Nothing here is physics-specific; Path A's only job is to be an
+accurate, general-purpose forecaster, trained the way any
+DINO-WM-style predictor is trained.
+
+Path B is a physical predictor built from a second, deliberately
+low-capacity probe. h_rho reads the same tokens z_1:t, but restricted
+to the frames the solver is about to step from, never the frame being
+predicted, so the probe cannot shortcut by seeing the answer. It
+emits an unconstrained parameter vector, which we squash into a
+fixed, physically sane range with a sigmoid reparameterization:
+
+  theta_raw = h_rho(z_1:t)
+  theta = lo + (hi - lo) * sigmoid(theta_raw), constrained to the box
+  [lo, hi]^K
+
+lo and hi are fixed constants, not learned. By default h_rho is a
+single linear map and theta is one vector per episode, pooled over
+patches and over the whole context window, rather than one per
+timestep. Physical parameters are properties of the system, not of
+the instant, and a probe with almost no capacity is the honest test
+of whether theta is linearly present in z at all. theta is then
+handed, with the current physical state and action, to a fixed
+integrator S:
+
+  s_B,(t+1) = S(s_t, a_t, theta)
+
+which produces an independent, physically-derived next-state
+estimate. S is hand-derived per benchmark (a point-mass
+contact-and-drag model, a rigid cart-pole, a quasi-static
+planar-pushing model; Section 4 gives the exact equations), and it is
+never trained. S owns zero learnable parameters, so every degree of
+freedom Path B has for explaining a transition lives in theta.
+
+3.2 Objective: the model as its own supervisor
+
+All losses are computed in a fixed, dataset-fitted normalized state
+space (z-scored per channel, held in buffers rather than learned, so
+a checkpoint is self-contained), which keeps L_A and L_B commensurate
+and alpha/beta scale-free:
+
+  L = L_A + alpha * L_B + beta * L_consistency
+
+  where:
+  L_A = || s_A - s_next ||^2
+  L_B = || s_B - stopgradient(s_A) ||^2
+  L_consistency = || s_A - s_B ||^2
+
+with beta = 0 by default. Everything this paper is built around is in
+the target of L_B: stopgradient(s_A), Path A's own prediction with
+gradient stopped, in place of the dataset label s_next.
+
+Once both paths exist, three candidate targets for L_B are available.
+Comparing s_B to itself is vacuous; nothing constrains theta.
+Comparing it to s_next is the obvious first choice. Comparing it to
+s_A is what we use. We reject the second option for a specific
+reason: fitting the physics path directly to the raw benchmark label
+tests whether the solver S can be made to match a transition for some
+theta, a question L_A already answers with a higher-capacity function
+class and, typically, lower error. It does not test whether theta
+explains anything the model itself relies on. Using stopgradient(s_A)
+instead asks the sharper question: starting from a prediction the
+model already trusts, can a near-zero-capacity, physically-constrained
+probe recover the compact parameterization underneath it? That is the
+top-down step from Section 1. The reliable upper level of the
+representation, s_A, becomes the training signal for the thin lower
+level, theta, and the loss above never uses a physical-parameter
+annotation to do it.
+
+The stop-gradient is what keeps this well-posed rather than circular.
+L_B never receives gradient through s_A, so it cannot move Path A's
+decoder or predictor toward the solver's output; the pressure runs
+one way, from the general prediction onto the physics probe. Drop the
+stop-gradient and minimizing the joint loss admits a degenerate
+shortcut: Path A drifts toward whatever Path B finds easiest to
+reproduce, which would make a bad theta look consistent by pulling
+the general predictor down to meet it rather than by explaining it.
+
+3.3 Design invariants
+
+Four structural properties make the recovered theta worth testing.
+Each is enforced as a checked invariant in the implementation, not
+left as a training convention that could silently drift.
+
+1. One latent, two predictions, neither post-hoc. s_A and s_B both
+branch from the same z (Section 3.1) and are computed independently;
+they are compared only at the loss, so neither is fit to the other
+after the fact.
+
+2. Path A regresses ground truth; Path B regresses Path A; never the
+reverse. L_A is the only term whose gradient into the decoder and
+predictor originates from s_next. L_B's target is detached (Section
+3.2), so with beta = 0 no configuration of the loss pushes L_B's
+gradient into Path A.
+
+3. theta is always a forward-pass output, never a free variable.
+theta equals bound_theta(h_rho(z)) on every forward pass, never an
+optimizable parameter fit directly to a target. If theta could be a
+free variable, L_B could be driven to zero by memorizing a
+per-episode value independent of z, and the experiment would say
+nothing about the latent.
+
+4. S is frozen and differentiable. S has zero learnable parameters,
+constants live in fixed buffers rather than as learnable parameters,
+so gradient flows through its fixed equations of motion into theta
+and hence into h_rho, but nothing inside S ever changes. The only way
+to lower L_B is to move theta in a direction the fixed physics of S
+turns into a better match for Path A. Whether that direction is also
+a physically meaningful one is exactly what the identifiability and
+transfer experiments in Section 4 test.
+
+The optional consistency term L_consistency in the loss above is
+symmetric between s_A and s_B and off by default. It is an ablation
+knob, not part of the main recipe: a nonzero, non-symmetric variant
+would reintroduce the coupling invariant 2 rules out.
+
+[Figure 2: "PhysWM architecture." A single encoder latent z feeds two
+heads. Path A (learned) is the ordinary next-state predictor: a
+block-causal spatio-temporal transformer rolls z forward to z_hat, a
+decoder reads out a state s_A, and L_A regresses the dataset's
+ground-truth next state, this path is exactly what a predictive world
+model already does well. Path B (physical) reads a physics-parameter
+vector theta off the same latent with a deliberately low-capacity
+probe, squashes it into a physically valid range, and integrates it
+through a frozen, zero-parameter differentiable solver to get an
+independent physical estimate s_B. Crucially, L_B does not use the
+dataset label: it regresses s_A with gradient stopped, Path A's own
+reliable prediction, not a physics annotation, is what shapes theta.
+Because the solver is frozen and differentiable, the only route for
+L_B's gradient back to the learnable parameters is through the
+physics equations into the probe, so theta can only improve by
+becoming a better physical explanation of what Path A already
+predicts.]
+
+
+4. EXPERIMENTAL SETUP
+
+We instantiate PhysWM on three benchmarks that share the same
+architecture, objective, and training loop (Section 3) and differ
+only in the observation, the state and action spaces, and the
+hand-derived solver S. This section gives the exact solvers (4.1),
+the diagnostic that checks each solver is expressive enough to
+explain real transitions before any claim about the probe is made
+(4.2), the data and architecture (4.3), and the evaluation protocol
+(4.4).
+
+4.1 Benchmarks and physics solvers
+
+PokeWorld. A synthetic point-mass benchmark built for this study. A
+poker, driven by the action, pushes a disc object subject to contact
+and viscous drag. State is (x, y, v_x, v_y), action is the poker's
+(x, y) position, and the physics is:
+
+  m * dv/dt = k * overlap(x, x_poker) * n_hat - c * v
+
+where overlap is the signed penetration between poker and object
+radii (zero outside contact) and n_hat is the contact normal. theta =
+(mass, contact_stiffness, drag, poker_radius, object_radius), five
+parameters, is sampled independently per episode and rendered as two
+soft discs on a blank field, so mass, stiffness, and drag are hidden
+behind identical-looking rollouts and the only route to them is the
+dynamics. Because only the ratios k/m and c/m affect the trajectory,
+mass, stiffness, and drag are not individually identifiable from
+state transitions alone; this is a property of the dynamics, not a
+limitation of the probe, and Section 4.4 reports it rather than
+working around it. PokeWorld is the one benchmark where theta is
+actually known, which is what makes the R² certificate possible.
+
+Cart-pole. State is dm_control's (x, angle, x_dot, angle_dot) (cart
+position, pole angle from upright, their velocities), action is a
+scalar force, and the solver is the standard cart-pole equations of
+motion with a uniform-rod pole (a 4/3 term is its moment of inertia
+about the hinge):
+
+  tau = (F + pole_mass * half_length * angle_dot^2 * sin(angle) -
+         cart_damping * x_dot) / (cart_mass + pole_mass)
+
+  angle_ddot = (gravity * sin(angle) - tau * cos(angle)) /
+    (half_length * (4/3 - pole_mass * cos^2(angle) /
+    (cart_mass + pole_mass)))
+
+  x_ddot = tau - pole_mass * half_length * angle_ddot * cos(angle) /
+    (cart_mass + pole_mass)
+
+integrated with semi-implicit Euler, matching MuJoCo's own
+integration style. theta = (cart_mass, pole_mass, pole_half_length,
+gravity, force_gain, cart_damping): six parameters, none of them
+labeled in the data. Episodes are live rollouts of
+swm/CartpoleDMControl-v0.
+
+Push-T. State is the environment's own seven-dimensional observation:
+agent position, block position, block angle, and the agent's (not the
+block's) velocity, a naming quirk in the environment worth flagging
+because it is easy to get backward when writing a solver against it.
+The agent follows the environment's exact PD law,
+
+  a = k_p * (target - x) - k_v * x_dot
+
+so its two gains are genuinely identifiable rather than merely fit.
+The block has no directly observed velocity, so we model it
+quasi-statically: contact is a soft penetration spring between the
+agent and a disc standing in for the T-shaped block, and the
+resulting force and torque map to block motion through an isotropic
+limit-surface mobility, with no block momentum. Rotation exists only
+because of a body-fixed center-of-friction offset from the block's
+geometric center; a disc pushed through its own center has zero lever
+arm and would never spin, so this offset is what makes the angular
+channel identifiable at all. theta = (agent_kp, agent_kv,
+agent_radius, block_radius, contact_stiffness, mobility_lin,
+mobility_ang, com_offset_x, com_offset_y), nine parameters.
+Approximating a T-block as a disc is a known structural mismatch,
+documented and measured rather than hidden (Section 4.2). Episodes
+are live rollouts of swm/PushT-v1 under a scripted policy that steers
+the agent toward the block; uniform random actions almost never make
+contact, which would leave the block's physics completely unexercised
+in the data.
+
+All three solvers are hand-derived, hardcoded integrators written as
+plain tensor operations, differentiable only in the sense that any
+such computation is differentiable under automatic differentiation,
+not through a general-purpose differentiable physics engine. theta is
+mapped from an unconstrained probe output into each solver's
+physically valid box via the sigmoid squashing described in Section
+3.1, with lo and hi fixed per parameter (for example, cart mass in
+[0.1, 5.0] kg, gravity in [1, 20] m/s²).
+
+4.2 Solver adequacy
+
+Before asking whether the probe can recover theta from the latent, we
+first ask a prior question: is each solver's fixed functional form
+even capable of explaining real transitions, for some theta? A null
+result on the probe would be uninformative without this check, since
+it could mean either that the physics is not in the latent or that
+the physics is not in the solver. We answer it by fitting a free
+per-episode theta directly against real transitions with gradient
+descent, an oracle that exists only for this diagnostic and is never
+used during PhysWM training, where theta is always a probe output
+(Section 3.3). The table below reports scaled RMSE (lower is better)
+against a persistence baseline (predicting no change from the current
+state) and against the solver run at its nominal, un-fit theta.
+
+  Benchmark    | Persistence | Nominal theta | Fitted theta (oracle)
+  -------------|-------------|----------------|----------------------
+  PokeWorld    |    0.312    |     0.228      |       0.0001
+  Cart-pole    |    0.166    |     0.006      |       0.0025
+  Push-T       |    0.352    |     0.031      |       0.021
+
+(Produced by scripts/smoke/validate_solvers.py.) All three solvers
+fit real transitions to near zero error given an oracle per-episode
+theta, so a low R² from the trained probe would indicate a latent
+that has not internalized the physics, not a solver that cannot
+express it. On Push-T, the disc approximation of the T-block is the
+dominant source of remaining error even at the oracle fit.
+
+Cart-pole's fitted theta recovers physically correct parameters from
+the MuJoCo rollouts (gravity approximately 9.81 m/s², cart mass
+approximately 1.01 kg, pole half-length approximately 0.517 m), and
+Push-T's fit recovers the environment's exact controller gains (k_p =
+100, k_v = 20), which is the sanity check that the agent half of that
+solver is not just adequate but exactly correct.
+
+4.3 Data and architecture
+
+Data. PokeWorld episodes are generated on the fly (64 training, 16
+validation, disjoint random seeds, 64 steps each). Cart-pole and
+Push-T episodes are live environment rollouts (64 training / 16
+validation episodes of 64 steps for cart-pole; 32 training / 8
+validation episodes of 48 steps for Push-T), rendered at 64x64.
+Validation episodes are drawn from an entirely separate seed range
+rather than held out from the same rollouts, so no window in
+validation shares a trajectory with training. Episodes are sliced
+into overlapping windows of 8 frames with stride 1; a window never
+straddles an episode boundary, since theta is constant within one.
+
+Encoder. Two options, swappable from config: a small dependency-free
+CNN producing a 4x4 grid of patch tokens (the default here, since it
+needs no pretrained weights and keeps the full study runnable on a
+single consumer GPU), or a frozen DINOv2-small backbone for
+experiments that need the real pretrained representation this paper's
+motivation is about. A state-only encoder is also available as an
+ablation that removes pixels and the visual representation entirely,
+isolating the two-path objective from whatever the encoder
+contributes.
+
+Predictor and heads. Path A's predictor is a 4-layer, 8-head
+block-causal transformer (hidden size 256, MLP width 512) over patch
+tokens, following DINO-WM (Zhou et al., 2024). The state decoder is a
+2-layer MLP over mean-pooled tokens. Path B's probe is, by default, a
+single linear map over mean-pooled, time-pooled tokens (zero hidden
+layers), initialized with small weights so the initial theta starts
+near each solver's nominal parameter set rather than at a random
+point in the box.
+
+Optimization. AdamW, learning rate 3e-4, weight decay 1e-4, batch
+size 32, 30 epochs, linear warmup over the first 5% of steps followed
+by cosine decay, gradient norm clipped to 1.0. State and action
+normalizers are z-scored from 512 sampled training windows once,
+before training, and then frozen as buffers. alpha = 1, beta = 0 in
+the loss unless stated otherwise.
+
+4.4 Evaluation protocol
+
+Three measurements test the central claim from three different
+angles: that theta is not just present in the latent but functionally
+responsible for what the model predicts.
+
+Identifiability certificate. On PokeWorld, where true theta is known,
+we accumulate predicted and true theta over a full validation epoch
+(never a single minibatch, since R² is only meaningful once the true
+parameter actually varies across the sample) and report per-parameter
+R² = 1 - (sum of squared residuals) / (total sum of squares).
+Parameters that are constant by construction, or constant within a
+given sample, return an explicit undefined value rather than a
+numerically large but meaningless score, and we report the ratios k/m
+and c/m alongside the raw parameters given the non-identifiability in
+Section 4.1.
+
+Out-of-distribution transfer. We evaluate a trained checkpoint on
+rollouts whose true physical parameters lie outside the training
+range (for example, an object mass or a controller gain beyond the
+box the model was trained on) and compare Path A's free-running
+prediction against Path B's. A latent that only memorized
+in-distribution correlations, rather than a theta doing physical
+work, should show Path A drifting while Path B, constrained by the
+solver's fixed equations regardless of what z says, continues to
+track the true dynamics.
+
+Downstream control. We plug a trained PhysWM checkpoint into the
+repository's model-predictive control stack (CEM/MPPI over the
+learned dynamics) and measure goal-reaching success rate under the
+same out-of-distribution parameter shift, against a predictive-only
+DINO-WM baseline trained identically but without Path B. This is the
+test that a merely decodable but functionally inert theta would fail:
+decoding a physical parameter from a latent is not the same claim as
+that parameter changing what the plan actually does.

@@ -1,0 +1,105 @@
+% Two-path architecture figure. Pure TikZ -- every box/label is real text,
+% not a raster image.
+%
+% Topology matches stable_worldmodel/wm/physwm/physwm.py exactly: encoder
+% and predictor are a SINGLE shared trunk producing one action-conditioned
+% latent z_hat, which forks into the two heads. Loss formulas are NOT drawn
+% here -- they are Eq. (4) in the text; the figure's only job is what feeds
+% what. Sized to its natural extent, not stretched to fill the column.
+\begin{figure*}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=7mm and 9mm,
+  box/.style={draw, rounded corners=2pt, align=center, font=\scriptsize,
+              minimum height=7mm, inner sep=3pt},
+  learned/.style={box, fill=blue!7, draw=blue!55},
+  physical/.style={box, fill=orange!8, draw=orange!65!black},
+  shared/.style={box, fill=gray!12, draw=gray!60, thick},
+  frozen/.style={box, fill=gray!25, draw=black, thick, dashed},
+  gt/.style={box, fill=green!8, draw=green!45!black},
+  lossdot/.style={draw, circle, fill=red!8, draw=red!55!black,
+              font=\scriptsize\itshape, inner sep=1pt, minimum size=7mm},
+  arr/.style={-{Stealth[length=1.8mm]}, thick},
+  detacharr/.style={-{Stealth[length=1.8mm]}, thick, dash pattern=on 2pt off 2pt, red!55!black},
+  ablarr/.style={-{Stealth[length=1.5mm]}, thin, dotted, gray!70},
+]
+
+% --- shared trunk: encoder and predictor produce ONE action-conditioned
+% latent z_hat, read by both heads ---
+\node[box, fill=white] (pixels) {pixels / state\\ $o_{\le t}$};
+\node[shared, right=of pixels] (encoder) {encoder\\ $z=f_\phi(o_{\le t})$};
+\node[shared, right=of encoder, minimum width=6mm] (z) {$z$};
+\node[shared, right=of z, text width=17mm] (predictor) {predictor\\ block-causal};
+\node[shared, right=of predictor, minimum width=7mm] (zhat) {$\hat z$};
+
+% --- Path A: learned, upper branch off z_hat ---
+\node[learned, above right=8mm and 9mm of zhat] (decoder) {state decoder};
+\node[learned, right=of decoder, minimum width=6mm] (stateA) {$s_A$};
+\node[gt, above=5mm of stateA] (target) {dataset $s_{\mathrm{next}}$};
+\node[lossdot, right=of stateA] (LA) {$\mathcal L_A$};
+
+% --- Path B: physical, lower branch off z_hat ---
+\node[physical, below right=8mm and 9mm of zhat] (probe) {probe (linear)};
+\node[physical, right=of probe, minimum width=6mm] (theta) {$\theta$};
+\node[frozen, right=of theta, text width=18mm] (solver) {frozen solver\\ $\dot v = F(s,a,\theta)/m$};
+\node[physical, right=of solver, minimum width=6mm] (stateB) {$s_B$};
+\node[box, fill=white, below=5mm of probe] (sa) {$(s_t,a_t)$};
+\node[lossdot, right=of stateB] (LB) {$\mathcal L_B$};
+
+% --- trunk wiring: strictly sequential, no fork until z_hat ---
+\draw[arr] (pixels) -- (encoder);
+\draw[arr] (encoder) -- (z);
+\draw[arr] (z) -- (predictor);
+\draw[arr] (predictor) -- (zhat);
+\draw[arr] (zhat.north) |- (decoder.west);
+\draw[arr] (zhat.south) |- (probe.west);
+
+% --- Path A wiring ---
+\draw[arr] (decoder) -- (stateA);
+\draw[arr] (stateA) -- (LA);
+\draw[arr] (target) -- (LA);
+
+% --- Path B wiring ---
+\draw[arr] (probe) -- (theta);
+\draw[arr] (theta) -- (solver);
+\draw[arr] (sa) -- (solver);
+\draw[arr] (solver) -- (stateB);
+\draw[arr] (stateB) -- (LB);
+
+% --- the key edge: Path A's own prediction as Path B's target ---
+\draw[detacharr] (stateA.south) .. controls +(0,-9mm) and +(0,9mm) .. (LB.north);
+\node[red!55!black, font=\tiny\itshape, align=left]
+  at ($(stateA)!0.5!(LB)+(9mm,0)$) {stop-gradient\\ target};
+
+% --- gradient path back into probe, through the frozen solver ---
+\draw[arr, orange!65!black, -{Stealth[length=1.6mm]}, dashed]
+  (LB.south) -- ++(0,-3mm) -| (solver.south);
+\node[orange!65!black, font=\tiny\itshape] at ($(solver)+(0,-11mm)$)
+  {$\nabla$ through the frozen solver};
+
+% --- the ablation this topology rules out ---
+\draw[ablarr] (z.south) .. controls +(0,-13mm) and +(-8mm,0) .. (probe.west);
+\node[gray!60, font=\tiny\itshape] at ($(z)+(-1mm,-12mm)$) {ablation: probe reads $z$};
+
+\end{tikzpicture}%
+}
+\caption{\textbf{\method architecture.} Encoder and predictor form one
+shared trunk producing a single action-conditioned latent $\hat z$; both
+heads read $\hat z$, never a private view of the observation. \pathA
+(blue) is the ordinary predictor: a decoder reads $\hat z$ to a state
+$s_A$, and $\mathcal L_A$ (\Cref{eq:loss}) regresses the dataset's
+ground truth, exactly what a predictive world model already does.
+\pathB (orange) reads a physics vector $\theta$ off the same $\hat z$
+with a deliberately low-capacity probe, integrates it through a
+\emph{frozen, zero-parameter} solver (gray, dashed) to get an
+independent estimate $s_B$. $\mathcal L_B$ does \emph{not} use the
+dataset label: it regresses $s_A$ with gradient stopped (red, dashed),
+so the only route back to a learnable parameter is through the fixed
+solver into $\theta$ (orange dashed arrow), and $\theta$ can only
+improve by becoming a better physical explanation of what \pathA
+already predicts. The dotted arrow is not part of the method: it marks
+the pre-action routing ablation (\Cref{sec:setup-benchmarks}), where the
+probe reads $z$ instead of $\hat z$.}
+\label{fig:architecture}
+\end{figure*}

@@ -1,0 +1,164 @@
+\section{Method}
+\label{sec:method}
+
+\Cref{fig:architecture} lays out the two-path world model
+(\method) end to end. This section defines it precisely: the shared
+encoder and two prediction heads (\Cref{sec:method-forward}), the
+objective that couples them (\Cref{sec:method-loss}), and the four
+structural properties that make the recovered physical parameters a
+claim about the model rather than an artifact of how it was trained
+(\Cref{sec:method-invariants}).
+
+\input{figures/architecture}
+
+\subsection{Shared latent, two heads}
+\label{sec:method-forward}
+
+Given an observation window $o_{1:T}$ (pixels, or raw state for the
+ablation in \Cref{sec:experimental-setup}), a single encoder $f_\phi$
+produces per-frame patch tokens $z_t = f_\phi(o_t) \in \R^{N \times
+D}$. Neither head has a private view of the observation: both are
+computed from $z$, and, as the rest of this section makes precise, both
+read it through the same predictor, never one reading $z$ directly
+while the other reads the predictor's output.
+
+\pathA is a standard learned predictor. A block-causal
+spatio-temporal transformer $g_\psi$ \citep{zhou2024dinowm} attends
+over all patches of frames $\le t$ and predicts a residual update to
+the next frame's tokens,
+\begin{equation}
+  \hat z_{t+1} = z_t + g_\psi(z_{1:t}, a_{1:t}),
+\end{equation}
+and a decoder $d_\chi$ pools $\hat z_{t+1}$ over patches and reads out
+a state estimate $s_{A,t+1} = d_\chi(\hat z_{t+1})$ (\stateA{} once the
+timestep is unambiguous, as in \Cref{eq:loss}). Nothing here
+is physics-specific; \pathA's only job is to be an accurate,
+general-purpose forecaster, trained the way any DINO-WM-style
+predictor is trained.
+
+\pathB is a physical predictor built from a second, deliberately
+low-capacity probe. $h_\rho$ reads the \emph{same} action-conditioned
+tokens $\hat z_{1:t}$ that \pathA's decoder reads, not the raw encoder
+output $z$, restricted to the frames the solver is about to step from,
+never the frame being predicted, so the probe cannot shortcut by seeing
+the answer. Reading $z$ directly, before the predictor conditions it on
+the action, is kept only as a falsifying ablation
+(\Cref{sec:setup-benchmarks}): if it scores the same as reading
+$\hat z$, then sharing the predictor's action-conditioned latent between
+the two paths is decoration, not a load-bearing design choice. The probe
+emits an unconstrained parameter vector, which we squash into a fixed,
+physically sane range with a sigmoid reparameterization:
+\begin{equation}
+  \theta_{\mathrm{raw}} = h_\rho(\hat z_{1:t}), \qquad
+  \theta = \mathrm{lo} + (\mathrm{hi} - \mathrm{lo}) \odot
+    \sigma(\theta_{\mathrm{raw}}) \in [\mathrm{lo}, \mathrm{hi}]^K.
+\end{equation}
+$\mathrm{lo}, \mathrm{hi} \in \R^K$ are fixed constants, not learned.
+By default $h_\rho$ is a single linear map and $\theta$ is one vector
+per episode, pooled over patches and over the whole context window,
+rather than one per timestep. Physical parameters are properties of
+the system, not of the instant, and a probe with almost no capacity is
+the honest test of whether $\theta$ is linearly present in $z$ at all.
+$\theta$ is then handed, with the current physical state and action,
+to a fixed integrator $S$,
+\begin{equation}
+  s_{B,t+1} = S(s_t, a_t, \theta),
+\end{equation}
+which produces an independent, physically-derived next-state estimate.
+$S$ is hand-derived per benchmark (a point-mass contact-and-drag
+model, a rigid cart-pole, a quasi-static planar-pushing model;
+\Cref{sec:experimental-setup} gives the exact equations), and it is
+never trained. $S$ owns zero learnable parameters, so every degree of
+freedom \pathB has for explaining a transition lives in $\theta$.
+
+\subsection{Objective: the model as its own supervisor}
+\label{sec:method-loss}
+
+All losses are computed in a fixed, dataset-fitted normalized state
+space (z-scored per channel, held in buffers rather than learned, so a
+checkpoint is self-contained), which keeps $\mathcal L_A$ and
+$\mathcal L_B$ commensurate and $\alpha,\beta$ scale-free:
+\begin{equation}
+  \label{eq:loss}
+  \mathcal L \;=\; \underbrace{\big\lVert \stateA - \stategt
+    \big\rVert^2}_{\mathcal L_A}
+  \;+\; \alpha \underbrace{\big\lVert \stateB - \stopgrad{\stateA}
+    \big\rVert^2}_{\mathcal L_B}
+  \;+\; \beta \underbrace{\big\lVert \stateA - \stateB \big\rVert^2}
+    _{\mathcal L_{\mathrm{consistency}}},
+\end{equation}
+with $\beta = 0$ by default. Everything this paper is built around is
+in the target of $\mathcal L_B$: $\stopgrad{\stateA}$, \pathA's own
+prediction with gradient stopped, in place of the dataset label
+$\stategt$.
+
+Once both paths exist, three candidate targets for $\mathcal L_B$ are
+available. Comparing $\stateB$ to itself is vacuous; nothing
+constrains $\theta$. Comparing it to $\stategt$ is the obvious first
+choice. Comparing it to $\stateA$ is what we use. We reject the second
+option for a specific reason: fitting the physics path directly to the
+raw benchmark label tests whether $S(\cdot,\cdot,\theta)$ can be made
+to match a transition for some $\theta$, a question $\mathcal L_A$
+already answers with a higher-capacity function class and, typically,
+lower error. It does not test whether $\theta$ explains anything the
+model itself relies on. Using $\stopgrad{\stateA}$ instead asks the
+sharper question: starting from a prediction the model already trusts,
+can a near-zero-capacity, physically-constrained probe recover the
+compact parameterization underneath it? That is the top-down step from
+\Cref{sec:introduction}. The reliable upper level of the
+representation, $\stateA$, becomes the training signal for the thin
+lower level, $\theta$, and \Cref{eq:loss} never uses a
+physical-parameter annotation to do it.
+
+The stop-gradient is what keeps this well-posed rather than circular.
+$\mathcal L_B$ never receives gradient through $\stateA$, so it cannot
+move \pathA's decoder or predictor toward the solver's output; the
+pressure runs one way, from the general prediction onto the physics
+probe. Drop the stop-gradient and minimizing \Cref{eq:loss} jointly
+admits a degenerate shortcut: \pathA drifts toward whatever \pathB
+finds easiest to reproduce, which would make a bad $\theta$ look
+consistent by pulling the general predictor down to meet it rather
+than by explaining it.
+
+\subsection{Design invariants}
+\label{sec:method-invariants}
+
+Four structural properties make the recovered $\theta$ worth testing.
+Each is enforced as a checked invariant in the implementation, not
+left as a training convention that could silently drift.
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=2pt]
+  \item \textbf{One latent, two predictions, neither post-hoc.}
+    $\stateA$ and $\stateB$ both branch from the same $z$
+    (\Cref{sec:method-forward}) and are computed independently; they
+    are compared only at the loss, so neither is fit to the other
+    after the fact.
+  \item \textbf{\pathA regresses ground truth; \pathB regresses
+    \pathA; never the reverse.} $\mathcal L_A$ is the only term whose
+    gradient into $d_\chi$ and $g_\psi$ originates from $\stategt$.
+    $\mathcal L_B$'s target is detached (\Cref{sec:method-loss}), so
+    with $\beta=0$ no configuration of \Cref{eq:loss} pushes
+    $\mathcal L_B$'s gradient into \pathA.
+  \item \textbf{$\theta$ is always a forward-pass output, never a free
+    variable.} $\theta = \mathrm{bound\_theta}(h_\rho(z))$ on every
+    forward pass, never an optimizable parameter fit directly to a
+    target. If $\theta$ could be a free variable, $\mathcal L_B$ could
+    be driven to zero by memorizing a per-episode value independent of
+    $z$, and the experiment would say nothing about the latent.
+  \item \textbf{$S$ is frozen and differentiable.} $S$ has zero
+    learnable parameters, constants live in fixed buffers rather than
+    \texttt{nn.Parameter}s, so gradient flows through its fixed
+    equations of motion into $\theta$ and hence into $h_\rho$, but
+    nothing inside $S$ ever changes. The only way to lower
+    $\mathcal L_B$ is to move $\theta$ in a direction the fixed physics
+    of $S$ turns into a better match for \pathA. Whether that direction
+    is also a physically meaningful one is exactly what the
+    identifiability and transfer experiments in
+    \Cref{sec:experimental-setup} test.
+\end{enumerate}
+
+The optional consistency term $\mathcal L_{\mathrm{consistency}}$ in
+\Cref{eq:loss} is symmetric between $\stateA$ and $\stateB$ and off by
+default. It is an ablation knob, not part of the main recipe: a
+nonzero, non-symmetric variant would reintroduce the coupling
+invariant~2 rules out.

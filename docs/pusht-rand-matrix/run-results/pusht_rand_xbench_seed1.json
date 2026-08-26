@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "benchmark": "pusht_rand",
+    "physics_target": "path_a",
+    "encoder": "tiny_cnn",
+    "epochs": 40,
+    "episodes": 512,
+    "length": 48,
+    "window": 8,
+    "seed": 1,
+    "theta_names": [
+      "agent_kp",
+      "agent_kv",
+      "agent_radius",
+      "block_radius",
+      "contact_stiffness",
+      "mobility_lin",
+      "mobility_ang",
+      "com_offset_x",
+      "com_offset_y"
+    ],
+    "windows": {
+      "train": 20992,
+      "val": 5248
+    }
+  },
+  "substitution": {
+    "probe": 0.21281392872333527,
+    "shuffled": 0.2729318141937256,
+    "nominal": 0.23946034908294678
+  },
+  "beats_nominal": true,
+  "beats_shuffled": true,
+  "shuffled_minus_probe": 0.06011788547039032,
+  "sensitivity": {
+    "agent_kp": 0.03982960432767868,
+    "agent_kv": 0.0352589413523674,
+    "agent_radius": 0.0016536385519430041,
+    "block_radius": 0.003845554543659091,
+    "contact_stiffness": 0.0024645414669066668,
+    "mobility_lin": 0.00174059031996876,
+    "mobility_ang": 0.0017483276315033436,
+    "com_offset_x": 0.002932292874902487,
+    "com_offset_y": 0.0030175866559147835
+  },
+  "theta_spread": {
+    "agent_kp": 20.107542037963867,
+    "agent_kv": 3.0317118167877197,
+    "agent_radius": 4.638517379760742,
+    "block_radius": 11.014506340026855,
+    "contact_stiffness": 1.5451064109802246,
+    "mobility_lin": 0.19295914471149445,
+    "mobility_ang": 6.399431731551886e-05,
+    "com_offset_x": 3.4310903549194336,
+    "com_offset_y": 11.703563690185547
+  },
+  "prediction": {
+    "path_a": 0.47509809347503656,
+    "persistence": 0.6213830178291627
+  }
+}

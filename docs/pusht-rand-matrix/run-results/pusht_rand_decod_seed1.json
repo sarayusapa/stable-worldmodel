@@ -1,0 +1,132 @@
+{
+  "meta": {
+    "encoder": "tiny_cnn",
+    "probe_hidden": 0,
+    "probe_source": "predicted",
+    "detach_probe_input": false,
+    "window": 8,
+    "tactile": true,
+    "epochs": 40,
+    "episodes": 512,
+    "length": 48,
+    "alpha": 1.0,
+    "seed": 1,
+    "batch_size": 32,
+    "conditions": "predictive,physwm",
+    "amp": true,
+    "windows": {
+      "train": 20992,
+      "val": 5248
+    }
+  },
+  "results": {
+    "predictive/decodable": {
+      "agent_kp": 0.14652961492538452,
+      "agent_kv": 0.1464737057685852,
+      "agent_radius": NaN,
+      "block_radius": NaN,
+      "contact_stiffness": NaN,
+      "mobility_lin": NaN,
+      "mobility_ang": NaN,
+      "com_offset_x": NaN,
+      "com_offset_y": NaN
+    },
+    "predictive/own_probe": {
+      "agent_kp": -0.1854710578918457,
+      "agent_kv": -0.1271418333053589,
+      "agent_radius": NaN,
+      "block_radius": NaN,
+      "contact_stiffness": NaN,
+      "mobility_lin": NaN,
+      "mobility_ang": NaN,
+      "com_offset_x": NaN,
+      "com_offset_y": NaN
+    },
+    "physwm/decodable": {
+      "agent_kp": 0.13460993766784668,
+      "agent_kv": 0.06635695695877075,
+      "agent_radius": NaN,
+      "block_radius": NaN,
+      "contact_stiffness": NaN,
+      "mobility_lin": NaN,
+      "mobility_ang": NaN,
+      "com_offset_x": NaN,
+      "com_offset_y": NaN
+    },
+    "physwm/own_probe": {
+      "agent_kp": -0.036112308502197266,
+      "agent_kv": -0.11489951610565186,
+      "agent_radius": NaN,
+      "block_radius": NaN,
+      "contact_stiffness": NaN,
+      "mobility_lin": NaN,
+      "mobility_ang": NaN,
+      "com_offset_x": NaN,
+      "com_offset_y": NaN
+    }
+  },
+  "dynamics_results": {
+    "predictive/decodable": {
+      "agent_kp": 0.14652961492538452,
+      "agent_kv": 0.1464737057685852,
+      "agent_radius": NaN,
+      "block_radius": NaN,
+      "contact_stiffness": NaN,
+      "mobility_lin": NaN,
+      "mobility_ang": NaN,
+      "com_offset_x": NaN,
+      "com_offset_y": NaN
+    },
+    "predictive/own_probe": {
+      "agent_kp": -0.1854710578918457,
+      "agent_kv": -0.1271418333053589,
+      "agent_radius": NaN,
+      "block_radius": NaN,
+      "contact_stiffness": NaN,
+      "mobility_lin": NaN,
+      "mobility_ang": NaN,
+      "com_offset_x": NaN,
+      "com_offset_y": NaN
+    },
+    "physwm/decodable": {
+      "agent_kp": 0.13460993766784668,
+      "agent_kv": 0.06635695695877075,
+      "agent_radius": NaN,
+      "block_radius": NaN,
+      "contact_stiffness": NaN,
+      "mobility_lin": NaN,
+      "mobility_ang": NaN,
+      "com_offset_x": NaN,
+      "com_offset_y": NaN
+    },
+    "physwm/own_probe": {
+      "agent_kp": -0.036112308502197266,
+      "agent_kv": -0.11489951610565186,
+      "agent_radius": NaN,
+      "block_radius": NaN,
+      "contact_stiffness": NaN,
+      "mobility_lin": NaN,
+      "mobility_ang": NaN,
+      "com_offset_x": NaN,
+      "com_offset_y": NaN
+    }
+  },
+  "prediction": {
+    "predictive": {
+      "path_a_vs_dataset": 0.49083479526653295,
+      "path_a_query_vs_dataset": 0.4863574335358132,
+      "path_b_vs_teacher": 0.44672779190918616,
+      "path_b_vs_dataset": 0.242162489135784,
+      "persistence_vs_dataset": 0.6213830234184776,
+      "persistence_query_vs_dataset": 0.618104485936011
+    },
+    "physwm": {
+      "path_a_vs_dataset": 0.4750956941042324,
+      "path_a_query_vs_dataset": 0.4700010598917445,
+      "path_b_vs_teacher": 0.42761043494127143,
+      "path_b_vs_dataset": 0.21466373368948852,
+      "persistence_vs_dataset": 0.6213830234184776,
+      "persistence_query_vs_dataset": 0.618104485936011
+    }
+  }
+}

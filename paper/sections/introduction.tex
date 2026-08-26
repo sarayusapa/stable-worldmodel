@@ -1,0 +1,74 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Self-supervised visual encoders trained at scale
+\citep{caron2021dino,oquab2023dinov2,assran2023ijepa} produce
+representations that are remarkably good at recognition, retrieval, and
+forecasting what a scene will look like next. What they are not
+explicitly asked to do is represent the physical quantities that
+generate that future: mass, drag, contact stiffness, gain. Nothing in a
+next-latent prediction loss notices if those quantities never become
+separable, linearly-readable directions (\citealt{filling-hierarchy-blog}
+names this shape, borrowed for this paper's title). A latent world
+model can predict the next state of a physical system accurately while
+its latent carries almost no linearly-recoverable information about the
+parameters that produced the trajectory
+\citep{latent-wm-identifiability}. The model knows what happens next,
+not the physics of why, and a predictor that never internalized that
+physics has no reason to generalize when it changes (a lighter object,
+a stiffer contact), since nothing in training asked it to separate the
+dynamics from the trajectories it was shown.
+
+The standard fix, label the physical parameters and regress them, is
+often unavailable (real video has no mass channel) and changes the
+question more than the missing labels suggest: fitting a probe to a
+label tests whether that label is recoverable by some function, not
+whether the physics is what the model actually uses to predict. We want
+evidence of the second kind, parameters functionally responsible for a
+prediction the model already trusts, recovered without ever showing it
+a parameter label.
+
+\input{figures/hierarchy}
+
+Our approach uses the model against itself. A next-state predictor
+trained the ordinary way is, by construction, the most reliable signal
+available about what the model believes happens next, so a
+low-capacity probe should find it easier to be honest about than a raw
+dataset label the rest of the model was never optimized against
+(\Cref{fig:hierarchy}). We add a second, low-capacity readout to the
+same latent emitting a physical parameter vector $\theta$, pass it
+through a frozen differentiable physics solver together with the
+current state and action, and train the result to match the model's
+own next-state prediction under a stop-gradient, never the dataset
+label. Because the solver is frozen and the probe near-capacity-free,
+the only way to reduce this loss is to make $\theta$ a physically
+meaningful explanation of a prediction the model was already making for
+other reasons. This costs no physics annotation, and building it forced
+two diagnoses we did not set out to make. Our contributions:
+
+\begin{enumerate}[leftmargin=1.6em, itemsep=2pt]
+  \item A two-path world model where a latent next-state predictor and
+    a physics-solver path read the same encoder latent, the physics
+    path targeting the predictor's own stop-gradient output rather than
+    a dataset or parameter label (\Cref{sec:method}).
+  \item Three hand-derived, zero-parameter solvers (point-mass contact,
+    cart-pole, quasi-static planar pushing) showing the recipe is
+    unchanged across a synthetic identifiability benchmark, an analytic
+    control task, and contact-rich manipulation, all on one consumer
+    GPU (\Cref{sec:experimental-setup}).
+  \item A diagnosis of \emph{which} physical parameters self-distillation
+    can induce and which it cannot, not just whether it works in
+    aggregate: on \textsc{PokeWorld}, label-free $R^2$ moves from
+    strongly negative to weakly positive for the one parameter with a
+    sharp, sub-step signature in the tactile channel, and does not move
+    at all for two parameters read off a slower, weaker motion cue
+    (\Cref{sec:results-pokeworld}), a split invisible to a single pooled
+    identifiability number.
+  \item A diagnosis of why identifiability claims are not safe without
+    first checking a benchmark's own solver-adequacy precondition: on a
+    second benchmark, an oracle-fit $\theta$ initially failed to beat
+    persistence at all, traced not to a modeling limitation but to a
+    $\theta$-independent bug that had been silently producing a
+    plausible-looking but meaningless recovery anomaly
+    (\Cref{sec:results-other-benchmarks}).
+\end{enumerate}

@@ -85,7 +85,7 @@ PokeWorld's parameter names).
 
 ---
 
-## 3. PushT (`pusht_rand`) — 512 episodes, run by me, in progress
+## 3. PushT (`pusht_rand`) — 512 episodes, run by me, complete
 
 **Benchmark:** PushT (pymunk physics), but with **per-episode
 randomized ground-truth physics** (`pusht_randomized_episodes`, written
@@ -115,13 +115,24 @@ Config: 512 episodes, length 48, window 8, 40 epochs (decodability.py
 uses `--conditions predictive,physwm`; cross_benchmark.py always trains
 one `alpha=1.0` model).
 
-**Early smoke-test signal (8 episodes, 2 epochs, toy scale — not the
-real run):** probe already beat both nominal *and* shuffled cleanly —
-a good early sign, though at far too small a scale to mean anything on
-its own.
+**Outcome (see `docs/pusht-rand-matrix/READING_THE_LOGS.md` for full
+detail):** all 6 jobs finished cleanly (rc=0). Label-free check
+(`cross_benchmark.py`): probe beats shuffled in all 3 seeds (gap
+0.057-0.060 scaled RMSE) and beats nominal in 2/3 seeds — theta is
+carrying real per-episode information. Sensitivity is dominated by
+`agent_kp`/`agent_kv` (~0.035-0.040) over everything else
+(~0.001-0.007), matching the physical intuition that the PD gains
+directly set push force while `com_offset`/`mobility`/`contact_stiffness`
+are second-order. Path A beats persistence in 2/3 seeds. Labeled R²
+check (`decodability.py`, `agent_kp`/`agent_kv` only — the only two
+params with real ground truth): mostly negative `own_probe` R² at this
+scale, a stricter bar the label-free check doesn't require — same
+qualitative pattern PokeWorld and Fetch both showed before their own
+labeled ceilings needed a larger episode budget to turn positive.
 
-**Result dir:** `/workspace/physwm-artifacts/runs/pusht-cartpole-matrix/pusht_rand_*.json`
-(not yet pulled to this repo — see Task list).
+**Result dir:** `docs/pusht-rand-matrix/run-results/*.json` (6 files,
+committed), `docs/pusht-rand-matrix/run-logs/*.log` (local-only, per
+this repo's `*.log` convention).
 
 ---
 

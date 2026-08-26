@@ -1,0 +1,148 @@
+\section{Results}
+\label{sec:results}
+
+\subsection{The tactile channel is what makes identification possible at all}
+\label{sec:results-certificate}
+
+Before asking whether \method recovers $\theta$, we first ask whether
+$\theta$ is recoverable by anything, given only the observation this
+paper's encoder sees. \Cref{tab:touch-certificate} fits a free
+per-episode $\theta$ directly against real \textsc{PokeWorld}
+transitions by gradient descent, the same oracle diagnostic behind
+\Cref{tab:solver-adequacy}, with and without the tactile channel
+(the peak contact-force magnitude over a transition's sub-steps) in the
+state.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lcc}
+\toprule
+Parameter & With touch & Without touch \\
+\midrule
+Mass               & 0.834  & 0.009  \\
+Contact stiffness  & 0.755  & 0.084  \\
+Drag               & 0.754  & $-0.214$ \\
+\bottomrule
+\end{tabular}
+\caption{Oracle recoverability certificate ($R^2$ of a freely-fit
+per-episode $\theta$ against the true parameter, 64 episodes, 2000 fit
+steps). Without the tactile channel the ceiling is at or below zero for
+every parameter: from motion alone, the dynamics depend only on the
+ratios $k/m$ and $c/m$, so mass, stiffness, and drag are individually
+unidentifiable in principle, not merely hard to learn. \citet{latent-wm-identifiability}
+report a comparable drag certificate of 0.89 on their own simulator and
+data budget; ours is lower under the corrected parameter ranges and
+integration step described in \Cref{sec:setup-benchmarks}, and we do
+not treat the two numbers as directly comparable.}
+\label{tab:touch-certificate}
+\end{table}
+
+\subsection{PokeWorld: theta recovery at the 2048-episode budget}
+\label{sec:results-pokeworld}
+
+\Cref{tab:pokeworld-recovery} reports the evaluation protocol from
+\Cref{sec:setup-protocol}, pooled over three seeds at 2048 episodes, the
+budget the data-floor sweep in our run log identified as necessary
+before PokeWorld's own decodable ceiling turns positive. Two readouts
+appear for each condition: \emph{decodable}, a supervised probe fit
+after training on the frozen latent, which uses labels only to evaluate
+whether the representation carries the information, and
+\emph{own\_probe}, the model's own read-out, trained with no label ever
+shown to it, the claim this paper is actually making.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lccc}
+\toprule
+Parameter & Predictive ($\alpha{=}0$) & \method & Theta-oracle \\
+\midrule
+\multicolumn{4}{l}{\textit{decodable (labeled probe, evaluation only)}} \\
+Contact stiffness & 0.75 & 0.78 & 0.82 \\
+Drag              & $-0.19$ & $-0.15$ & $-0.40$ \\
+Mass              & 0.24 & 0.24 & 0.17 \\
+\midrule
+\multicolumn{4}{l}{\textit{own\_probe (label-free, no ground truth during training)}} \\
+Contact stiffness & $-1.36$ & 0.09 & 0.80 \\
+Drag              & $-0.01$ & $-6.42$ & $-0.40$ \\
+Mass              & $-0.08$ & $-0.35$ & 0.16 \\
+\bottomrule
+\end{tabular}
+\caption{Val $R^2$, mean over seeds $\{0,1,2\}$, 2048 episodes, 60
+epochs. Theta-oracle is a third condition trained with an oracle-quality
+solver target rather than \method's self-distillation, an upper bound on
+what the recipe could reach, not a baseline we expect to match.}
+\label{tab:pokeworld-recovery}
+\end{table}
+
+Contact stiffness is where the recipe works as claimed, and only
+partially. Under the predictive-only baseline no gradient ever reaches
+the probe, so its own\_probe $R^2$ sits at $-1.36$, effectively a random
+read-out. Under \method it rises to $+0.09$: still weak and, in one of
+three seeds, still on the wrong side of zero, but a consistent
+directional move away from the predictive baseline and toward the
+$0.80$ ceiling a theta-oracle target reaches. The gap between $0.09$ and
+the $0.78$ that a labeled probe can decode from the same \method latent
+is the actual open problem: the physical information the tactile
+channel makes recoverable in principle
+(\Cref{tab:touch-certificate}) is present in the latent our training
+induces, closer to present than the model's own read-out shows, but the
+label-free probe has not yet learned to extract it.
+
+Drag and mass do not show the same pattern, and we report this
+plainly rather than working around it. Drag's own\_probe $R^2$ is
+\emph{worse} under \method ($-6.42$) than under the predictive baseline
+($-0.01$), and its decodable ceiling never clears zero even for the
+theta-oracle condition ($-0.40$), meaning drag is not linearly
+recoverable from this latent at this data budget by any readout we
+tried, oracle included. Mass is weakly decodable everywhere
+($0.17$--$0.24$) but self-distillation does not improve its own\_probe
+over the baseline either ($-0.35$ against $-0.08$). One parameter
+recovering while two do not is itself informative: contact stiffness has
+the sharpest signature in the touch channel (a brief force peak at
+contact), while drag and mass are inferred from the shape of the glide
+between contacts, a weaker, slower signal that a linear probe over
+mean-pooled tokens may simply be underpowered to extract at this window
+length and data budget.
+
+\subsection{Contact-rich manipulation, cart-pole, and randomized Push-T}
+\label{sec:results-other-benchmarks}
+
+\paragraph{Fetch push.} We instantiate \method on real Gymnasium-Robotics
+Fetch push (MuJoCo), the 2-parameter case
+($\theta = (\mathrm{mass}, \mathrm{friction})$; Fetch's contact softness
+is a solver parameter, not a material property, so it has no stiffness
+analog to identify). \pathA
+beats persistence cleanly at 256 episodes, but theta recovery is
+currently uninformative: the supervised decodable ceiling is negative
+for both parameters, which points at 256 episodes being below this
+benchmark's own data floor, the same failure mode
+\Cref{sec:results-pokeworld} shows PokeWorld needed 2048 episodes to
+clear. Separately, \textsc{FetchPush} has no analog of PokeWorld's touch
+channel, so per \Cref{tab:touch-certificate}'s logic only the ratio
+friction/mass, not the two raw values, should be identifiable from
+motion alone; the current evaluation code does not yet report that
+ratio for this benchmark. A solver-adequacy check in the style of
+\Cref{tab:solver-adequacy} also surfaced a genuine bug rather than a
+modeling limitation: the frozen solver's gripper term was applying its
+per-transition action displacement once per integration substep instead
+of once per transition, a $10\times$ overshoot with no dependence on
+$\theta$ at all, which confounded every number the 256-episode run
+produced. The fix is a one-line change to the affected term; the matrix
+has not yet been re-run against the corrected solver, so we do not
+report Fetch numbers here.
+
+\paragraph{Cart-pole and randomized Push-T.} Two further benchmarks are
+running under the same recipe, unchanged. Cart-pole
+(\Cref{sec:setup-benchmarks}) has no registered ground truth at all
+(\texttt{has\_theta\_true: False}), so it tests the label-free claim
+where no $R^2$ certificate is even possible in principle, only
+prediction quality and the functional-use tests of
+\Cref{sec:setup-protocol}. Standard Push-T has fixed dynamics, which
+makes a shuffled-theta control vacuous, so we additionally run a
+per-episode randomized variant in which the environment's own PD-control
+gains are ground truth by construction and object mass/friction are
+randomized to make the shuffled control meaningful, even though the
+solver has no exact ground-truth counterpart for the latter two.
+Both jobs were still in progress at the time of writing; we report
+their outcome once complete rather than characterize a run before it
+has finished.

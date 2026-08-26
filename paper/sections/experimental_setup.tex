@@ -1,0 +1,215 @@
+\section{Experimental setup}
+\label{sec:experimental-setup}
+
+We instantiate \method on three benchmarks that share the same
+architecture, objective, and training loop (\Cref{sec:method}) and
+differ only in the observation, the state and action spaces, and the
+hand-derived solver $S$. This section gives the exact solvers
+(\Cref{sec:setup-benchmarks}), the diagnostic that checks each solver
+is expressive enough to explain real transitions before any claim
+about the probe is made (\Cref{sec:setup-adequacy}), the data and
+architecture (\Cref{sec:setup-data}), and the protocol used to produce
+the results in the next section (\Cref{sec:setup-protocol}).
+
+\subsection{Benchmarks and physics solvers}
+\label{sec:setup-benchmarks}
+
+\paragraph{\textsc{PokeWorld}.} A synthetic point-mass benchmark built
+for this study. A poker, driven by the action, pushes a disc object
+subject to contact and viscous drag. State is $(x, y, v_x, v_y)$,
+action is the poker's $(x, y)$ position, and the physics is
+\begin{equation}
+  m \, \dot v = k \cdot \mathrm{overlap}(x, x_{\mathrm{poker}}) \cdot
+    \hat n - c\, v,
+\end{equation}
+where $\mathrm{overlap}$ is the signed penetration between poker and
+object radii (zero outside contact) and $\hat n$ the contact normal.
+$\theta = (m, k, c, r_{\mathrm{poker}}, r_{\mathrm{object}})$, five
+parameters, is sampled independently per episode and rendered as two
+soft discs on a blank field, so mass, stiffness, and drag are hidden
+behind identical-looking rollouts and the only route to them is the
+dynamics. Because only the ratios $k/m$ and $c/m$ affect the
+trajectory, $m$, $k$, and $c$ are not individually identifiable from
+state transitions alone; this is a property of the dynamics, not a
+limitation of the probe, and \Cref{sec:setup-protocol} reports it
+rather than working around it. \textsc{PokeWorld} is the one benchmark
+where $\theta$ is actually known, which is what makes the $R^2$
+certificate possible.
+
+\paragraph{Cart-pole.} State is \texttt{dm\_control}'s
+$(x, \phi, \dot x, \dot\phi)$ (cart position, pole angle from upright,
+their velocities), action is a scalar force, and the solver is the
+standard cart-pole equations of motion with a uniform-rod pole (the
+$4/3$ term is its moment of inertia about the hinge):
+\begin{equation}
+  \tau = \frac{F + m_p \ell \dot\phi^2 \sin\phi - b\, \dot x}{m_c +
+    m_p}, \qquad
+  \ddot\phi = \frac{g \sin\phi - \tau \cos\phi}
+    {\ell\!\left(\tfrac{4}{3} - \tfrac{m_p \cos^2\phi}{m_c + m_p}\right)},
+  \qquad
+  \ddot x = \tau - \frac{m_p \ell \ddot\phi \cos\phi}{m_c + m_p},
+\end{equation}
+integrated with semi-implicit Euler, matching MuJoCo's own integration
+style. $\theta = (m_c, m_p, \ell, g, k_F, b)$: cart mass, pole mass,
+pole half-length, gravity, the force-to-actuation gain, and cart
+damping. Six parameters, none of them labeled in the data. Episodes
+are live rollouts of \texttt{swm/CartpoleDMControl-v0}.
+
+\paragraph{Push-T.} State is the environment's own seven-dimensional
+observation, agent position, block position, block angle, and the
+agent's (not the block's) velocity, a naming quirk in the environment
+worth flagging because it is easy to get backward when writing a
+solver against it. The agent follows the environment's exact PD law,
+$a = k_p(\mathrm{target} - x) - k_v \dot x$, so its two gains are
+genuinely identifiable rather than merely fit. The block has no
+directly observed velocity, so we model it quasi-statically: contact
+is a soft penetration spring between the agent and a disc standing in
+for the T-shaped block, and the resulting force and torque map to
+block motion through an isotropic limit-surface mobility, with no
+block momentum. Rotation exists only because of a body-fixed
+center-of-friction offset from the block's geometric center; a disc
+pushed through its own center has zero lever arm and would never spin,
+so this offset is what makes the angular channel identifiable at all.
+$\theta = (k_p, k_v, r_{\mathrm{agent}}, r_{\mathrm{block}}, k,
+\mu_{\mathrm{lin}}, \mu_{\mathrm{ang}}, c_x, c_y)$, nine parameters.
+Approximating a T-block as a disc is a known structural mismatch,
+documented and measured rather than hidden (\Cref{sec:setup-adequacy}).
+Episodes are live rollouts of \texttt{swm/PushT-v1} under a scripted
+policy that steers the agent toward the block; uniform random actions
+almost never make contact, which would leave the block's physics
+completely unexercised in the data.
+
+All three solvers are hand-derived, hardcoded integrators written as
+plain tensor operations, differentiable only in the sense that any
+such computation is differentiable under automatic differentiation,
+not through a general-purpose differentiable physics engine. $\theta$
+is mapped from an unconstrained probe output into each solver's
+physically valid box via $\mathrm{lo} + (\mathrm{hi} - \mathrm{lo})
+\cdot \sigma(\theta_{\mathrm{raw}})$, with $\mathrm{lo}$, $\mathrm{hi}$
+fixed per parameter (e.g.\ cart mass in $[0.1, 5.0]\,\mathrm{kg}$,
+gravity in $[1, 20]\,\mathrm{m/s^2}$); \Cref{sec:method-forward} gives
+the general form.
+
+\subsection{Solver adequacy}
+\label{sec:setup-adequacy}
+
+Before asking whether the probe can recover $\theta$ from the latent,
+we first ask a prior question: is each solver's fixed functional form
+even capable of explaining real transitions, for some $\theta$? A null
+result on the probe would be uninformative without this check, since
+it could mean either that the physics is not in the latent or that the
+physics is not in the solver. We answer it by fitting a free
+per-episode $\theta$ directly against real transitions with gradient
+descent, an oracle that exists only for this diagnostic and is never
+used during \method training, where $\theta$ is always a probe output
+(\Cref{sec:method-invariants}). \Cref{tab:solver-adequacy} reports
+scaled RMSE against a persistence baseline ($s_{t+1} = s_t$) and
+against the solver run at its nominal, un-fit $\theta$.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lccc}
+\toprule
+Benchmark & Persistence & Nominal $\theta$ & Fitted $\theta$ (oracle) \\
+\midrule
+\textsc{PokeWorld} & 0.312 & 0.228 & \textbf{0.0001} \\
+Cart-pole          & 0.166 & 0.006 & \textbf{0.0025} \\
+Push-T             & 0.352 & 0.031 & \textbf{0.021}  \\
+\bottomrule
+\end{tabular}
+\caption{Solver adequacy, scaled RMSE, lower is better, produced by
+\texttt{scripts/smoke/validate\_solvers.py}. All three solvers fit
+real transitions to near zero error given an oracle per-episode
+$\theta$, so a low $R^2$ from the trained probe would indicate a
+latent that has not internalized the physics, not a solver that
+cannot express it. On Push-T, the
+disc approximation of the T-block is the dominant source of remaining
+error even at the oracle fit; \Cref{sec:setup-benchmarks} documents
+why.}
+\label{tab:solver-adequacy}
+\end{table}
+
+Cart-pole's fitted $\theta$ recovers physically correct parameters
+from the MuJoCo rollouts (gravity $\approx 9.81\,\mathrm{m/s^2}$, cart
+mass $\approx 1.01\,\mathrm{kg}$, pole half-length $\approx
+0.517\,\mathrm{m}$), and Push-T's fit recovers the environment's exact
+controller gains ($k_p{=}100$, $k_v{=}20$), the sanity check that the
+agent half of that solver is exactly correct, not merely adequate.
+
+\subsection{Data and architecture}
+\label{sec:setup-data}
+
+\paragraph{Data.} \textsc{PokeWorld} episodes are generated on the
+fly (64 training, 16 validation, disjoint random seeds, 64 steps each).
+Cart-pole and Push-T episodes are live environment rollouts (64
+training / 16 validation episodes of 64 steps for cart-pole; 32
+training / 8 validation episodes of 48 steps for Push-T), rendered at
+$64\times64$. Validation episodes are drawn from an entirely separate
+seed range rather than held out from the same rollouts, so no window
+in validation shares a trajectory with training. Episodes are sliced
+into overlapping windows of $T{=}8$ frames with stride 1; a window
+never straddles an episode boundary, since $\theta$ is constant within
+one (\Cref{sec:method-forward}).
+
+\paragraph{Encoder.} Two options, swappable from config: a small
+dependency-free CNN producing a $4\times4$ grid of patch tokens
+(the default here, since it needs no pretrained weights and keeps the
+full study runnable on a single consumer GPU), or a frozen DINOv2-small
+backbone for experiments that need the real pretrained representation
+this paper's motivation is about. A state-only encoder is also
+available as an ablation that removes pixels and the visual
+representation entirely, isolating the two-path objective from
+whatever the encoder contributes.
+
+\paragraph{Predictor and heads.} \pathA's predictor is a 4-layer,
+8-head block-causal transformer (hidden size 256, MLP width 512) over
+patch tokens, following DINO-WM \citep{zhou2024dinowm}. The state
+decoder is a 2-layer MLP over mean-pooled tokens. \pathB's probe is,
+by default, a single linear map over mean-pooled, time-pooled tokens
+(zero hidden layers), initialized with small weights so the initial
+$\theta$ starts near each solver's nominal parameter set rather than
+at a random point in the box.
+
+\paragraph{Optimization.} AdamW, learning rate $3\times10^{-4}$,
+weight decay $10^{-4}$, batch size 32, 30 epochs, linear warmup over
+the first 5\% of steps followed by cosine decay, gradient norm clipped
+to 1.0. State and action normalizers are z-scored from 512 sampled
+training windows once, before training, and then frozen as buffers.
+$\alpha{=}1$, $\beta{=}0$ in \Cref{eq:loss} unless stated otherwise.
+
+\subsection{Evaluation protocol}
+\label{sec:setup-protocol}
+
+Three measurements test the central claim from different angles: that
+$\theta$ is functionally responsible for what the model predicts, not
+merely present in the latent somewhere.
+
+\paragraph{Identifiability certificate.} On \textsc{PokeWorld}, where
+true $\theta$ is known, we accumulate predicted and true $\theta$ over
+a full validation epoch (never a single minibatch, since $R^2$ is only
+meaningful once the true parameter actually varies across the sample)
+and report per-parameter $R^2 = 1 - \mathrm{SS}_{\mathrm{res}} /
+\mathrm{SS}_{\mathrm{tot}}$. Parameters that are constant by
+construction, or constant within a given sample, return an explicit
+undefined value rather than a numerically large but meaningless score,
+and we report the ratios $k/m$ and $c/m$ alongside the raw parameters
+given the non-identifiability in \Cref{sec:setup-benchmarks}.
+
+\paragraph{Out-of-distribution transfer.} We evaluate a trained
+checkpoint on rollouts whose true physical parameters lie outside the
+training range (for example, an object mass or a controller gain
+beyond the box the model was trained on) and compare \pathA's
+free-running prediction against \pathB's. A latent that only memorized
+in-distribution correlations, rather than a $\theta$ doing physical
+work, should show \pathA drifting while \pathB, constrained by the
+solver's fixed equations regardless of what $z$ says, continues to
+track the true dynamics.
+
+\paragraph{Downstream control.} We plug a trained \method checkpoint
+into the repository's model-predictive control stack (CEM/MPPI over
+the learned dynamics) and measure goal-reaching success rate under the
+same out-of-distribution parameter shift, against a predictive-only
+DINO-WM baseline trained identically but without \pathB. This is the
+test that a merely decodable but functionally inert $\theta$ would
+fail: decoding a physical parameter from a latent is not the same
+claim as that parameter changing what the plan actually does.

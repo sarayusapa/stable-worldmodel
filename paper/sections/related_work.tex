@@ -1,0 +1,84 @@
+\section{Related Work}
+\label{sec:related-work}
+
+\paragraph{Self-supervised representations and their hierarchy.}
+Contrastive, self-distillation, and joint-embedding objectives
+\citep{caron2021dino,oquab2023dinov2,assran2023ijepa,he2022mae} produce
+visual features that transfer well to recognition and, increasingly, to
+world modeling \citep{zhou2024dinowm}, but standard probing only asks
+whether a concept is linearly recoverable somewhere in the network
+\citep{alain2016probes}. We ask a functional version instead: whether a
+concept, once pushed through the physics it is supposed to govern,
+reproduces a prediction the model already relies on. The tall-but-thin
+hierarchy framing follows \citet{filling-hierarchy-blog}; the specific
+mechanism of predicting a hierarchy of teacher representations follows
+\citet{constructive-ssl-blog}, which we repurpose for a target of a
+different kind, physical parameters mapped through a fixed solver
+rather than another learned embedding.
+
+\paragraph{Latent world models.}
+Predicting forward in a learned latent space
+\citep{ha2018worldmodels,hafner2019planet,hafner2020dreamer,
+hafner2023dreamerv3} is the standard recipe for model-based control
+from images. DINO-WM \citep{zhou2024dinowm} predicts forward in a
+frozen, pretrained latent with a block-causal transformer; \pathA is
+this recipe unmodified, so \pathB has an accurate, unremarkable
+baseline to be compared against. None of these models expose the
+physical parameters underlying the dynamics they predict.
+
+\paragraph{Physical identifiability.}
+\citet{latent-wm-identifiability} measures the gap directly: accurate
+next-state prediction with almost nothing about the generating physics
+linearly recoverable. Its negative result, that ratio-type parameters
+are not individually identifiable no matter how good the probe, is a
+structural fact about the dynamics that \textsc{PokeWorld}
+(\Cref{sec:experimental-setup}) reproduces deliberately, and its
+probe-then-$R^2$ methodology is the certificate we adopt once a model
+exists to certify. The same gap turns up elsewhere: physical
+plausibility is linearly decodable from video diffusion states that
+were never given a physics objective \citep{esmati2026invisiblehand},
+and preventing representational collapse in a JEPA world model does not
+by itself preserve physical state \citep{zeng2026phylatent}. Neither
+asks whether the decodable signal is used for anything, which is what
+the functional-use evaluation in \Cref{sec:setup-protocol} is for.
+Closest in spirit is \citet{mao2024piwm}, which aligns latent states
+with physical quantities under weak, distribution-based supervision and
+a \emph{learned} dynamics model. What differs is what is fixed: no
+physical label of any kind here, and a dynamics model that stays frozen
+throughout.
+
+\paragraph{Physics-informed and structured dynamics.}
+Interaction networks \citep{battaglia2016interaction} and
+physics-informed objectives build structure into the dynamics function
+or supervise physical quantities directly, typically learning that
+function end to end. Our solver is instead hand-derived, frozen, and
+owns zero learnable parameters (\Cref{sec:method}), closer to
+differentiable simulation used as a fixed decoder
+\citep{jatavallabhula2021gradsim} than to physics-informed
+regularization of a learned one, though that comparison too has a
+difference in what trains it: gradSim backpropagates from pixels
+through a differentiable renderer end to end, while our solver is never
+optimized and its target is a predictor's own belief. \citet{li2026ldr}
+takes the opposite structural choice from ours, integrating a video
+world model's latent transition kinematically within a single latent
+path, learning only a higher-order residual there; we keep the physics
+computation in a second head that can be turned off and falsified
+independently of \pathA.
+
+\paragraph{Self-distillation.}
+Training against a stop-gradient target traces to classical
+distillation \citep{hinton2015distillation} and appears label-free in
+\citep{caron2021dino,grill2020byol,assran2023ijepa}, all predicting one
+embedding from another. We reuse the mechanism for a target of a
+different kind (physical parameters through a fixed solver, not another
+learned embedding), and the stop-gradient plays a different role: not
+preventing collapse, but enforcing the one-way dependency that keeps
+\pathB from pulling \pathA toward itself (\Cref{sec:method}).
+
+\paragraph{Contact-rich manipulation.}
+Push-T \citep{chi2023diffusionpolicy} is a standard contact-rich
+manipulation benchmark; we model its block with the standard
+quasi-static limit-surface approximation and treat the disc-for-T-block
+mismatch as measured rather than hidden
+(\Cref{sec:experimental-setup}). The cart-pole solver is evaluated
+against DeepMind Control Suite rollouts \citep{tassa2018dmcontrol}.

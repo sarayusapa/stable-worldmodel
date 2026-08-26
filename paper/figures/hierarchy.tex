@@ -1,0 +1,47 @@
+% Concept figure: filling a tall-but-thin representation hierarchy from
+% the top down. Pure TikZ, relative positioning throughout so a box that
+% needs more room than expected pushes its neighbors instead of overlapping
+% them.
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=10mm,
+  level/.style={draw, rounded corners=3pt, align=center, font=\small,
+                text width=6.0cm, inner sep=5pt},
+  solid_level/.style={level, fill=blue!8, draw=blue!55, thick},
+  thin_level/.style={level, fill=red!5, draw=red!55, dashed, thick},
+  sidelabel/.style={font=\scriptsize\itshape, align=left, text width=2.7cm},
+]
+  \node[solid_level] (top)
+    {\textbf{High-level semantics}\\ pretrained visual features (e.g.\ DINO)};
+  \node[solid_level, below=of top] (mid)
+    {\textbf{Next-state prediction}\\ accurate, reliable};
+  \node[thin_level, below=of mid] (bot)
+    {\textbf{Physical latents} $\theta$\\ mass, drag, friction --
+    \emph{thin, underspecified}};
+
+  % this work: reliable mid-level prediction supervises the thin bottom
+  \draw[-{Stealth[length=2.5mm]}, thick, blue!60!black]
+    (mid.south west) .. controls +(-1.1,-0.6) and +(-1.1,0.6) .. (bot.north west);
+  \node[sidelabel, blue!60!black, left=4mm of bot]
+    {\textbf{this work:} model's own prediction as a stop-gradient target};
+
+  % predictive training alone never reaches the bottom level
+  \draw[gray!55, -{Stealth[length=2mm]}, dashed]
+    (mid.south east) .. controls +(1.1,-0.6) and +(1.1,0.6) .. (bot.north east);
+  \node[gray!60, font=\small] at ($(mid.south east)!0.5!(bot.north east)$) {$\times$};
+  \node[sidelabel, gray!60, right=4mm of bot]
+    {predictive objective alone: next state right, physics untouched};
+
+\end{tikzpicture}
+\caption{\textbf{Filling a thin foundation from the top.}
+Self-supervised encoders build a hierarchy that is tall at the top
+(rich semantics) but thin at the bottom (physical structure). A world
+model trained only for next-state prediction inherits this shape: it
+gets the top level right without the bottom level ever becoming
+physically meaningful. We use the reliable top-level signal, the
+model's own next-state prediction, as the training target for a
+low-capacity, physics-constrained probe at the bottom, without ever
+touching a physical-parameter label.}
+\label{fig:hierarchy}
+\end{figure}
