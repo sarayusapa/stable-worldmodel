@@ -126,9 +126,9 @@ CartPole & Prediction RMSE & Persistence $0.199$ & $0.792$ \\
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{../generated/fetch_push_gt_vs_basewm_vs_physwm.png}
-  \caption{FetchPush error map on the held-out window with the largest difference between the two Path-A models. Left: the real final frame. Top right: ground-truth object trajectory against the predictive baseline and \model. Bottom right: per-timestep scaled state RMSE; brighter cells indicate larger error. The models predict state, not pixels, so the rendered frame supplies visual context rather than a pixel-reconstruction target.}
-  \label{fig:fetch-error-map}
+  \includegraphics[width=\linewidth]{../../docs/pusht_rand_pixel_diff_error_maps.png}
+  \caption{Randomized PushT across consecutive timesteps. Rows show the ground-truth rendered observations, states predicted by \model and re-rendered through the environment, and their absolute pixel differences. Brighter pixels mark larger disagreement.}
+  \label{fig:pusht-timestamps}
 \end{figure}
 
 \begin{figure}[t]
