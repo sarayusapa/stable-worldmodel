@@ -40,8 +40,6 @@ Predictive world models can forecast dynamics without organizing their represent
 
 World models compress observations and actions into representations useful for predicting future dynamics \citep{ha2018worldmodels,hafner2020dreamer,hafner2023dreamerv3,zhou2024dinowm}. Predictive accuracy alone, however, does not ensure that these representations expose mass, damping, stiffness, friction, or control response. A high-capacity predictor may exploit trajectory correlations while leaving the governing physical factors entangled, even when its next-state predictions are accurate \citep{mao2024piwm}. This separates predicting \emph{what happens} from representing \emph{why the system evolves that way}.
 
-\input{../../paper/figures/hierarchy}
-
 We study whether known physical equations can ground a flexible predictive world model without physical-parameter annotations. \model produces two next-state predictions from the same action-conditioned latent (\Cref{fig:architecture}). Path A is a learned decoder trained on observed transitions. Path B maps the latent to a compact vector $\hat\theta$ and evaluates a frozen differentiable solver. Path B targets Path A's stopped-gradient prediction rather than the dataset state directly. The neural path remains anchored to data and free to absorb model mismatch; the physical path asks whether the model's predictive belief admits a compact equation-based explanation. This fixed-decoder role is related to differentiable system identification \citep{jatavallabhula2021gradsim}, but our training target is the predictor's belief rather than rendered pixels or labeled physical parameters.
 
 Our contribution is threefold. First, we introduce a shared-latent, two-path objective for grounding predictions in a supplied equation family without parameter labels. Second, we evaluate grounding functionally by changing only the solver's parameter vector while holding states, actions, weights, and equations fixed. Third, we distinguish \emph{semantic parameters}, which match named ground-truth quantities, from \emph{effective physical coordinates}, which improve equation rollouts but may compensate for non-identifiability or solver mismatch.
@@ -125,6 +123,13 @@ CartPole & Prediction RMSE & Persistence $0.199$ & $0.792$ \\
 \section{Results and discussion}
 
 \paragraph{FetchPush satisfies the predictive premise.} Path A reaches $0.420\pm0.015$ scaled RMSE, compared with $0.648\pm0.037$ for persistence, and wins in every seed (Table~\ref{tab:main}). The physics loss also changes the equation path substantially: its error against the stopped-gradient teacher falls from $8.758\pm0.398$ without grounding to $0.752\pm0.036$ with grounding. The shared latent therefore supports an equation-constrained reconstruction of the neural prediction, even though the raw mass and friction coordinates are not semantically identifiable at this data budget.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{../generated/fetch_push_gt_vs_basewm_vs_physwm.png}
+  \caption{FetchPush error map on the held-out window with the largest difference between the two Path-A models. Left: the real final frame. Top right: ground-truth object trajectory against the predictive baseline and \model. Bottom right: per-timestep scaled state RMSE; brighter cells indicate larger error. The models predict state, not pixels, so the rendered frame supplies visual context rather than a pixel-reconstruction target.}
+  \label{fig:fetch-error-map}
+\end{figure}
 
 \begin{figure}[t]
   \centering
